@@ -179,6 +179,33 @@ const LoginForm = () => {
     }
   };
 
+  const handleDebugAccess = () => {
+    console.log("Emergency admin access button clicked");
+    
+    // Create admin credentials
+    const adminCredentials = {
+      userId: 'admin123',
+      name: 'Admin User',
+      email: 'admin@example.com',
+      role: 'admin'
+    };
+    
+    // Set credentials in localStorage
+    localStorage.setItem('token', 'emergency-admin-token');
+    localStorage.setItem('userRole', 'admin');
+    localStorage.setItem('userData', JSON.stringify(adminCredentials));
+    
+    // Log the current authentication state for debugging
+    console.log("Auth state after setting admin credentials:");
+    console.log("- isAuthenticated:", authService.isAuthenticated());
+    console.log("- userRole:", authService.getUserRole());
+    console.log("- userData:", authService.getUserData());
+    
+    // Force direct navigation to admin dashboard with full page reload
+    console.log("Redirecting to admin dashboard...");
+    window.location.href = '/admin-dashboard';
+  };
+
   return (
     <div className="w-full max-w-md">
       <form onSubmit={handleSubmit} className="space-y-5">
@@ -340,31 +367,7 @@ const LoginForm = () => {
       <div className="mt-4 text-center">
         <button 
           type="button"
-          onClick={() => {
-            console.log("Setting emergency admin credentials via button");
-            
-            // Set admin credentials in localStorage for emergency access
-            const adminCredentials = {
-              userId: 'admin123',
-              name: 'Admin User',
-              email: 'admin@example.com',
-              role: 'admin'
-            };
-            
-            localStorage.setItem('token', 'debugtoken');
-            localStorage.setItem('userRole', 'admin');
-            localStorage.setItem('userData', JSON.stringify(adminCredentials));
-            
-            // Log the authentication state
-            console.log("Auth state after setting admin credentials:");
-            console.log("- Token:", localStorage.getItem('token'));
-            console.log("- User Role:", localStorage.getItem('userRole'));
-            console.log("- User Data:", localStorage.getItem('userData'));
-            
-            // Use direct URL change for most reliable redirection
-            console.log("Redirecting to admin dashboard...");
-            window.location.href = '/admin-dashboard';
-          }}
+          onClick={handleDebugAccess}
           className="text-xs text-red-400 hover:text-red-600 underline flex items-center justify-center mx-auto"
         >
           <FaExclamationTriangle className="mr-1" />

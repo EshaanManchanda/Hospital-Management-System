@@ -230,8 +230,8 @@ const AppContent = () => {
             {/* Admin Dashboard Routes */}
             <Route path="/admin-dashboard/*" element={
               <ProtectedRoute allowedRoles={['admin']}>
-                <Routes>
-                  <Route path="/" element={<AdminDashboard />}>
+                <AdminLayout>
+                  <Routes>
                     <Route index element={<Dashboard />} />
                     <Route path="patients" element={<Patients />} />
                     <Route path="doctors" element={<AdminDoctors />} />
@@ -245,9 +245,9 @@ const AppContent = () => {
                     <Route path="notifications" element={<Notifications />} />
                     <Route path="reports" element={<Reports />} />
                     <Route path="settings" element={<Settings />} />
-                  </Route>
-                  <Route path="*" element={<Navigate to="/admin-dashboard" replace />} />
-                </Routes>
+                    <Route path="*" element={<Navigate to="/admin-dashboard" replace />} />
+                  </Routes>
+                </AdminLayout>
               </ProtectedRoute>
             } />
             
