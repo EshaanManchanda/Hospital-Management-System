@@ -4,9 +4,8 @@ import patientService from '../services/patientService';
 import doctorService from '../services/doctorService';
 import appointmentService from '../services/appointmentService';
 
-// Use hardcoded API URL to avoid process.env issues
 // If you want to use environment variables later, make sure your build tool supports it
-const API_URL = 'http://127.0.0.1:5000/api';
+const API_URL = 'https://hospital-management-system-0qrz.onrender.com/api';
 const API_TIMEOUT = 30000;
 
 // Create an axios instance with default config
