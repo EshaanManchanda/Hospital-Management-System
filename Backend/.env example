@@ -1,0 +1,4 @@
+PORT=5000
+MONGO_URI=mongodb+srv://eshaanmanchanda01:admissionDetails01@cluster0.x0iqu.mongodb.net/hospital-management?retryWrites=true&w=majority&appName=Cluster0
+JWT_SECRET=b1851f743a76f8e47ec35a5e0e1417fe5979b2fe5f47a47f7c4cdbd572aa9f6c
+NODE_ENV=development
