@@ -29,6 +29,33 @@ export const protect = async (req, res, next) => {
   }
 };
 
+// Admin middleware - Check if user is admin
+export const admin = (req, res, next) => {
+  if (req.user && req.user.role === 'admin') {
+    next();
+  } else {
+    res.status(403).json({ message: 'Not authorized as admin' });
+  }
+};
+
+// Doctor middleware - Check if user is doctor
+export const doctor = (req, res, next) => {
+  if (req.user && req.user.role === 'doctor') {
+    next();
+  } else {
+    res.status(403).json({ message: 'Not authorized as doctor' });
+  }
+};
+
+// Patient middleware - Check if user is patient
+export const patient = (req, res, next) => {
+  if (req.user && req.user.role === 'patient') {
+    next();
+  } else {
+    res.status(403).json({ message: 'Not authorized as patient' });
+  }
+};
+
 // Role-based access control middleware
 export const authorize = (...roles) => {
   return (req, res, next) => {

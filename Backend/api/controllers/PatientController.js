@@ -41,9 +41,17 @@ export const registerPatient = async (req, res) => {
       isActive: true
     });
 
+    // Generate token for the new patient
+    const token = jwt.sign({ id: newUser._id }, process.env.JWT_SECRET || 'your_jwt_secret_key', {
+      expiresIn: '30d',
+    });
+
     res.status(201).json({ 
       success: true, 
       message: "Patient registered successfully", 
+      token,
+      patientId: newPatient._id, // Include patient ID directly in the response
+      role: "patient",
       data: {
         user: {
           _id: newUser._id,
@@ -112,6 +120,9 @@ export const getAllPatients = async (req, res) => {
 // Get patient by ID
 export const getPatientById = async (req, res) => {
   try {
+    console.log("getPatientById called with ID:", req.params.id);
+    console.log("Authenticated user:", req.user?._id);
+    
     const patient = await Patient.findById(req.params.id)
       .populate({
         path: 'user',
@@ -131,6 +142,7 @@ export const getPatientById = async (req, res) => {
       });
       
     if (!patient) {
+      console.log("Patient not found with ID:", req.params.id);
       return res.status(404).json({ 
         success: false, 
         message: "Patient not found" 
@@ -138,17 +150,23 @@ export const getPatientById = async (req, res) => {
     }
     
     // Check if user is authorized to view this patient's data
+    // Allow access if:
+    // 1. User is an admin
+    // 2. User is a doctor
+    // 3. User is the patient themselves
     if (
       req.user.role !== 'admin' && 
       req.user.role !== 'doctor' && 
       patient.user._id.toString() !== req.user._id.toString()
     ) {
+      console.log("User not authorized to view patient data. User ID:", req.user._id, "Patient User ID:", patient.user._id);
       return res.status(403).json({ 
         success: false, 
         message: "Not authorized to view this patient's data" 
       });
     }
     
+    console.log("Patient data successfully retrieved");
     res.status(200).json({ success: true, data: patient });
   } catch (error) {
     console.error("Error fetching patient:", error);

@@ -1,5 +1,4 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   IndianRupee, 
@@ -8,7 +7,8 @@ import {
   Calendar,
   CreditCard,
   BadgeIndianRupee,
-  BarChart3
+  BarChart3,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/admin/ui/button";
 import {
@@ -36,45 +36,13 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts";
+import { adminService } from "@/services";
 
-const monthlyData = [
-  { name: "Jan", revenue: 125000, expenses: 82000, profit: 43000 },
-  { name: "Feb", revenue: 136000, expenses: 86000, profit: 50000 },
-  { name: "Mar", revenue: 147000, expenses: 91000, profit: 56000 },
-  { name: "Apr", revenue: 159000, expenses: 94000, profit: 65000 },
-  { name: "May", revenue: 142000, expenses: 89000, profit: 53000 },
-  { name: "Jun", revenue: 151000, expenses: 92000, profit: 59000 },
-  { name: "Jul", revenue: 163000, expenses: 95000, profit: 68000 },
-  { name: "Aug", revenue: 171000, expenses: 99000, profit: 72000 },
-  { name: "Sep", revenue: 185000, expenses: 104000, profit: 81000 },
-  { name: "Oct", revenue: 198000, expenses: 109000, profit: 89000 },
-  { name: "Nov", revenue: 192000, expenses: 107000, profit: 85000 },
-  { name: "Dec", revenue: 210000, expenses: 115000, profit: 95000 },
-];
-
-const paymentMethodData = [
-  { name: "Insurance", value: 45 },
-  { name: "Credit Card", value: 30 },
-  { name: "Cash", value: 15 },
-  { name: "UPI", value: 10 },
-];
-
-const departmentRevenueData = [
-  { name: "Cardiology", value: 35000 },
-  { name: "Orthopedics", value: 28000 },
-  { name: "Pediatrics", value: 22000 },
-  { name: "Neurology", value: 30000 },
-  { name: "Radiology", value: 25000 },
-];
-
-const revenueByServiceData = [
-  { name: "Consultations", value: 42000 },
-  { name: "Surgeries", value: 68000 },
-  { name: "Laboratory", value: 35000 },
-  { name: "Radiology", value: 29000 },
-  { name: "Pharmacy", value: 36000 },
-];
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
 const formattedINR = (amount) => {
   return new Intl.NumberFormat('en-IN', {
@@ -88,8 +56,112 @@ const Revenue = () => {
   const navigate = useNavigate();
   const [selectedMonth, setSelectedMonth] = useState(new Date().toLocaleString('default', { month: 'long' }));
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   
-  const currentMonthData = monthlyData[new Date().getMonth()];
+  // State for API data
+  const [revenueSummary, setRevenueSummary] = useState(null);
+  const [monthlyRevenue, setMonthlyRevenue] = useState([]);
+  const [revenueBySource, setRevenueBySource] = useState([]);
+  
+  // Calculate date range for this year
+  const startOfYear = new Date(new Date().getFullYear(), 0, 1);
+  const endOfYear = new Date(new Date().getFullYear(), 11, 31);
+
+  useEffect(() => {
+    const fetchRevenueData = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        // Fetch all revenue data in parallel
+        const [summary, monthly, bySource] = await Promise.all([
+          adminService.getRevenueSummary(),
+          adminService.getMonthlyRevenue(new Date().getFullYear()),
+          adminService.getRevenueBySource(startOfYear, endOfYear)
+        ]);
+        
+        setRevenueSummary(summary);
+        
+        // Transform monthly data to match chart format
+        const transformedMonthly = monthly.map(item => {
+          const monthNames = [
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+          ];
+          const monthIndex = parseInt(item.month) - 1;
+          
+          return {
+            name: monthNames[monthIndex],
+            revenue: item.totalAmount,
+            // Estimated expenses (70% of revenue for demo)
+            expenses: Math.round(item.totalAmount * 0.7),
+            // Profit (30% of revenue for demo)
+            profit: Math.round(item.totalAmount * 0.3)
+          };
+        });
+        
+        setMonthlyRevenue(transformedMonthly);
+        
+        // Transform source data to match chart format
+        const transformedSourceData = bySource.map(item => ({
+          name: item._id,
+          value: item.totalAmount
+        }));
+        
+        setRevenueBySource(transformedSourceData);
+      } catch (err) {
+        console.error("Error fetching revenue data:", err);
+        setError("Failed to load revenue data. Please try again later.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchRevenueData();
+  }, []);
+  
+  // Calculate today's revenue (for demo purposes - random value)
+  const todayRevenue = Math.floor(Math.random() * 10000) + 40000;
+  
+  // Calculate current month's revenue
+  const currentMonthRevenue = revenueSummary?.currentMonth?.total || 0;
+  const previousMonthRevenue = revenueSummary?.previousMonth?.total || 0;
+  const growthPercentage = revenueSummary?.growth || 0;
+  
+  // Calculate total annual revenue
+  const totalAnnualRevenue = monthlyRevenue.reduce((sum, item) => sum + item.revenue, 0) || 0;
+  const annualGrowth = 15.7; // Placeholder for annual growth
+  
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[70vh]">
+        <Loader2 className="h-12 w-12 animate-spin text-hospital-primary mb-4" />
+        <p className="text-gray-600">Loading revenue data...</p>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[70vh]">
+        <div className="text-red-500 mb-4 text-center">
+          <svg className="h-12 w-12 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p className="text-lg font-semibold">{error}</p>
+        </div>
+        <Button 
+          onClick={() => window.location.reload()}
+          className="bg-hospital-primary hover:bg-hospital-accent"
+        >
+          Retry
+        </Button>
+      </div>
+    );
+  }
   
   return (
     <div className="container mx-auto px-4 py-8">
@@ -113,7 +185,7 @@ const Revenue = () => {
           </CardHeader>
           <CardContent>
             <div className="flex items-baseline justify-between">
-              <div className="text-2xl font-bold">₹48,590</div>
+              <div className="text-2xl font-bold">₹{todayRevenue.toLocaleString()}</div>
               <div className="text-sm text-green-500 flex items-center">
                 <TrendingUp className="h-4 w-4 mr-1" /> +12.5%
               </div>
@@ -127,9 +199,9 @@ const Revenue = () => {
           </CardHeader>
           <CardContent>
             <div className="flex items-baseline justify-between">
-              <div className="text-2xl font-bold">{formattedINR(currentMonthData.revenue)}</div>
-              <div className="text-sm text-green-500 flex items-center">
-                <TrendingUp className="h-4 w-4 mr-1" /> +8.3%
+              <div className="text-2xl font-bold">{formattedINR(currentMonthRevenue)}</div>
+              <div className={`text-sm flex items-center ${growthPercentage >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                <TrendingUp className="h-4 w-4 mr-1" /> {growthPercentage >= 0 ? '+' : ''}{growthPercentage.toFixed(1)}%
               </div>
             </div>
           </CardContent>
@@ -142,10 +214,10 @@ const Revenue = () => {
           <CardContent>
             <div className="flex items-baseline justify-between">
               <div className="text-2xl font-bold">
-                {formattedINR(monthlyData.reduce((sum, item) => sum + item.revenue, 0))}
+                {formattedINR(totalAnnualRevenue)}
               </div>
               <div className="text-sm text-green-500 flex items-center">
-                <TrendingUp className="h-4 w-4 mr-1" /> +15.7%
+                <TrendingUp className="h-4 w-4 mr-1" /> +{annualGrowth}%
               </div>
             </div>
           </CardContent>
@@ -212,7 +284,7 @@ const Revenue = () => {
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
-                    data={monthlyData}
+                    data={monthlyRevenue}
                     margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" />
@@ -236,24 +308,31 @@ const Revenue = () => {
           <CardHeader>
             <CardTitle className="flex items-center">
               <CreditCard className="h-5 w-5 mr-2" /> 
-              Revenue by Payment Method
+              Revenue by Source
             </CardTitle>
-            <CardDescription>Distribution of payment methods</CardDescription>
+            <CardDescription>Distribution of revenue sources</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={paymentMethodData}
-                  layout="vertical"
-                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" tickFormatter={(value) => `${value}%`} />
-                  <YAxis dataKey="name" type="category" width={100} />
-                  <Tooltip formatter={(value) => [`${value}%`, 'Percentage']} />
-                  <Bar dataKey="value" fill="#8884d8" />
-                </BarChart>
+                <PieChart>
+                  <Pie
+                    data={revenueBySource}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={true}
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {revenueBySource.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value) => [`₹${value.toLocaleString()}`, 'Amount']} />
+                  <Legend />
+                </PieChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
@@ -263,22 +342,23 @@ const Revenue = () => {
           <CardHeader>
             <CardTitle className="flex items-center">
               <BarChart3 className="h-5 w-5 mr-2" /> 
-              Revenue by Department
+              Revenue by Source Breakdown
             </CardTitle>
-            <CardDescription>Departmental revenue breakdown</CardDescription>
+            <CardDescription>Detailed breakdown by revenue source</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
-                  data={departmentRevenueData}
+                  data={revenueBySource}
                   margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" />
                   <YAxis tickFormatter={(value) => `₹${value/1000}K`} />
-                  <Tooltip formatter={(value) => [formattedINR(Number(value)), 'Revenue']} />
-                  <Bar dataKey="value" fill="#82ca9d" />
+                  <Tooltip formatter={(value) => [`₹${value.toLocaleString()}`, 'Amount']} />
+                  <Legend />
+                  <Bar dataKey="value" name="Revenue" fill="#3f51b5" />
                 </BarChart>
               </ResponsiveContainer>
             </div>

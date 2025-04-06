@@ -13,65 +13,32 @@ import {
   Clock,
   BellRing,
   HeartPulse,
-  Pill
+  Pill,
+  Home,
+  UserCheck,
+  PlusCircle,
+  DollarSign,
+  BedDouble,
+  BarChart2,
+  Calendar,
+  Bell
 } from "lucide-react";
+import logo from '@/assets/logo.svg';
 
-const navItems = [
-  {
-    title: "Dashboard",
-    icon: <LayoutDashboard className="h-5 w-5" />,
-    path: "/admin/dashboard",
-  },
-  {
-    title: "Patients",
-    icon: <Users className="h-5 w-5" />,
-    path: "/admin/patients",
-  },
-  {
-    title: "Doctors",
-    icon: <Stethoscope className="h-5 w-5" />,
-    path: "/admin/doctors",
-  },
-  {
-    title: "Appointments",
-    icon: <CalendarDays className="h-5 w-5" />,
-    path: "/admin/appointments",
-  },
-  {
-    title: "Medical Records",
-    icon: <FileText className="h-5 w-5" />,
-    path: "/admin/records",
-  },
-  {
-    title: "Pharmacy",
-    icon: <Pill className="h-5 w-5" />,
-    path: "/admin/pharmacy",
-  },
-  {
-    title: "Reports",
-    icon: <LineChart className="h-5 w-5" />,
-    path: "/admin/reports",
-  },
-  {
-    title: "Schedule",
-    icon: <Clock className="h-5 w-5" />,
-    path: "/admin/schedule",
-  },
-  {
-    title: "Messages",
-    icon: <MessageSquare className="h-5 w-5" />,
-    path: "/admin/messages",
-  },
-  {
-    title: "Notifications",
-    icon: <BellRing className="h-5 w-5" />,
-    path: "/admin/notifications",
-  },
-  {
-    title: "Settings",
-    icon: <Settings className="h-5 w-5" />,
-    path: "/admin/settings",
-  },
+const menuItems = [
+  { title: "Dashboard", path: "/admin-dashboard", icon: <Home className="mr-2 h-5 w-5" /> },
+  { title: "Patients", path: "/admin-dashboard/patients", icon: <Users className="mr-2 h-5 w-5" /> },
+  { title: "Doctors", path: "/admin-dashboard/doctors", icon: <UserCheck className="mr-2 h-5 w-5" /> },
+  { title: "Appointments", path: "/admin-dashboard/appointments", icon: <Calendar className="mr-2 h-5 w-5" /> },
+  { title: "Medical Records", path: "/admin-dashboard/medical-records", icon: <FileText className="mr-2 h-5 w-5" /> },
+  { title: "Pharmacy", path: "/admin-dashboard/pharmacy", icon: <PlusCircle className="mr-2 h-5 w-5" /> },
+  { title: "Revenue", path: "/admin-dashboard/revenue", icon: <DollarSign className="mr-2 h-5 w-5" /> },
+  { title: "Book Bed", path: "/admin-dashboard/book-bed", icon: <BedDouble className="mr-2 h-5 w-5" /> },
+  { title: "Messages", path: "/admin-dashboard/messages", icon: <MessageSquare className="mr-2 h-5 w-5" /> },
+  { title: "Schedule", path: "/admin-dashboard/schedule", icon: <Clock className="mr-2 h-5 w-5" /> },
+  { title: "Notifications", path: "/admin-dashboard/notifications", icon: <Bell className="mr-2 h-5 w-5" /> },
+  { title: "Reports", path: "/admin-dashboard/reports", icon: <BarChart2 className="mr-2 h-5 w-5" /> },
+  { title: "Settings", path: "/admin-dashboard/settings", icon: <Settings className="mr-2 h-5 w-5" /> },
 ];
 
 const Sidebar = ({ isOpen }) => {
@@ -86,18 +53,16 @@ const Sidebar = ({ isOpen }) => {
       )}
     >
       <div className="h-16 flex items-center justify-center border-b border-gray-200">
-        <Link to="/admin/dashboard" className="flex items-center gap-2">
-          <div className="bg-hospital-primary text-white p-1 rounded">
-            <HeartPulse className="h-6 w-6" />
-          </div>
-          <div className="text-xl font-display font-semibold text-gray-900">MediCore</div>
+        <Link to="/admin-dashboard" className="flex items-center gap-2">
+          <img src={logo} alt="Hospital Logo" className="h-8" />
+          <span className="text-lg font-semibold text-hospital-primary">Hospital Manager</span>
         </Link>
       </div>
 
       <div className="p-4">
         <p className="text-xs font-semibold text-gray-400 mb-4 uppercase">Menu</p>
         <nav className="space-y-1">
-          {navItems.map((item) => (
+          {menuItems.map((item) => (
             <Link 
               key={item.title} 
               to={item.path} 

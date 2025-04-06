@@ -16,6 +16,8 @@ import medicineRoutes from './api/routes/MedicineRoute.js';
 import prescriptionRoutes from './api/routes/PrescriptionRoute.js';
 import medicalRecordRoutes from './api/routes/MedicalRecordRoute.js';
 import dashboardRoutes from './api/routes/DashboardRoute.js';
+import bedRoutes from './api/routes/BedRoute.js';
+import revenueRoutes from './api/routes/RevenueRoute.js';
 
 // Load env variables
 dotenv.config();
@@ -48,6 +50,8 @@ app.use('/api/medicines', medicineRoutes);
 app.use('/api/prescriptions', prescriptionRoutes);
 app.use('/api/medical-records', medicalRecordRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/beds', bedRoutes);
+app.use('/api/revenue', revenueRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

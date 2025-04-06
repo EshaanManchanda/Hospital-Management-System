@@ -76,14 +76,30 @@ export const login = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    res.status(200).json({
+    // Prepare response data
+    const responseData = {
       _id: user._id,
       userId: user.userId,
       name: user.name,
       email: user.email,
       role: user.role,
-      token: generateToken(user._id),
-    });
+      token: generateToken(user._id)
+    };
+
+    // If user is a patient, include patient ID
+    if (user.role === 'patient') {
+      // Import the Patient model dynamically to avoid circular dependency
+      const { Patient } = await import("../models/Patient.js");
+      
+      // Find the patient record for this user
+      const patient = await Patient.findOne({ user: user._id });
+      
+      if (patient) {
+        responseData.patientId = patient._id;
+      }
+    }
+
+    res.status(200).json(responseData);
   } catch (error) {
     console.error("Login error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
