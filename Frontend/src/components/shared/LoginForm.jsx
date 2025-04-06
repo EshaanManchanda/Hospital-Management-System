@@ -61,6 +61,7 @@ const LoginForm = () => {
       const result = await testAuthentication(formData.email, formData.password);
       setApiStatus(result);
       
+      
       if (result.success) {
         // If successful authentication but normal login fails,
         // we can use this data to manually set localStorage
@@ -96,16 +97,13 @@ const LoginForm = () => {
         setTimeout(() => {
           // Get the user role directly from the response data first, then fallback to localStorage
           const userRole = data.role || authService.getUserRole() || 'admin'; // Fallback for testing
-          console.log("User role for navigation:", userRole);
           
           // If we have a role from the response, manually set it in case the service didn't
           if (data.role && !localStorage.getItem('userRole')) {
             localStorage.setItem('userRole', data.role);
-            console.log("Manually set userRole in localStorage:", data.role);
           } else if (!localStorage.getItem('userRole')) {
             // If no role in response or localStorage, set a fallback for testing
             localStorage.setItem('userRole', 'admin');
-            console.log("Set fallback userRole in localStorage: admin");
           }
           
           // Update redirects based on role
@@ -139,11 +137,9 @@ const LoginForm = () => {
     setLoginSuccess(false);
     setDebugInfo(null);
 
-    console.log("Attempting login with:", formData);
-
     try {
       // Call the login function from context with remember me option
-      await login(formData.email, formData.password, rememberMe);
+      const loginResponse = await login(formData.email, formData.password, rememberMe);
       
       // Reset form after successful login
       setFormData({
@@ -151,10 +147,29 @@ const LoginForm = () => {
         password: "",
       });
       
-      // Navigate to the page user tried to access initially, or home
-      navigate(from, { replace: true });
+      setLoginSuccess(true);
+      
+      // Get the user role from the response or localStorage
+      const userRole = loginResponse.role || authService.getUserRole();
+      console.log("User role for navigation:", userRole);
+      // Redirect based on user role
+      setTimeout(() => {
+        if (userRole === 'admin') {
+          navigate("/admin-dashboard", { replace: true });
+        } else if (userRole === 'doctor') {
+          navigate("/doctor-dashboard", { replace: true });
+        } else if (userRole === 'patient') {
+          navigate("/patient-dashboard", { replace: true });
+        } else if (userRole === 'nurse') {
+          navigate("/nurse-dashboard", { replace: true });
+        } else if (userRole === 'pharmacist') {
+          navigate("/pharmacy-dashboard", { replace: true });
+        } else {
+          // Default to home page if role is unknown
+          navigate("/", { replace: true });
+        }
+      }, 500);
     } catch (err) {
-      console.error("Login error:", err);
       setError(err.message || "Failed to login. Please check your credentials.");
       
       // If normal login fails, try the test authentication
@@ -326,18 +341,29 @@ const LoginForm = () => {
         <button 
           type="button"
           onClick={() => {
+            console.log("Setting emergency admin credentials via button");
+            
             // Set admin credentials in localStorage for emergency access
-            localStorage.setItem('token', 'debugtoken');
-            localStorage.setItem('userRole', 'admin');
-            localStorage.setItem('userData', JSON.stringify({
+            const adminCredentials = {
               userId: 'admin123',
               name: 'Admin User',
               email: 'admin@example.com',
               role: 'admin'
-            }));
+            };
             
-            // Navigate to admin
-            navigate('/admin', { replace: true });
+            localStorage.setItem('token', 'debugtoken');
+            localStorage.setItem('userRole', 'admin');
+            localStorage.setItem('userData', JSON.stringify(adminCredentials));
+            
+            // Log the authentication state
+            console.log("Auth state after setting admin credentials:");
+            console.log("- Token:", localStorage.getItem('token'));
+            console.log("- User Role:", localStorage.getItem('userRole'));
+            console.log("- User Data:", localStorage.getItem('userData'));
+            
+            // Use direct URL change for most reliable redirection
+            console.log("Redirecting to admin dashboard...");
+            window.location.href = '/admin-dashboard';
           }}
           className="text-xs text-red-400 hover:text-red-600 underline flex items-center justify-center mx-auto"
         >

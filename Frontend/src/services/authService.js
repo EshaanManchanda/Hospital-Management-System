@@ -24,6 +24,8 @@ const authService = {
         // Ensure we have a role - try different possible locations in the response
         const userRole = data.role || data.userRole || (data.user && data.user.role);
         
+        console.log("Role found in response:", userRole);
+        
         if (userRole) {
           localStorage.setItem('userRole', userRole);
           console.log("Role stored in localStorage:", userRole);
@@ -68,25 +70,12 @@ const authService = {
    */
   debugLogin: async (email, password) => {
     try {
-      console.log('Debug: Attempting login with:', { email, password });
-      
-      // Log the API URL
-      console.log('Debug: API URL:', process.env.REACT_APP_API_URL);
-      
       // Make the request without storing anything
       const response = await api.post('/auth/login', { email, password });
-      
-      console.log('Debug: Login response:', response.data);
       
       // Return the data
       return response.data;
     } catch (error) {
-      console.error('Debug: Login error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        headers: error.response?.headers
-      });
       throw error;
     }
   },
@@ -100,8 +89,6 @@ const authService = {
     try {
       const response = await api.post('/patients/register', userData);
       const data = response.data;
-      
-      console.log("Registration response:", data);
       
       // Check if registration is successful
       if (data.success) {
@@ -130,15 +117,11 @@ const authService = {
           };
           
           localStorage.setItem('userData', JSON.stringify(userData));
-          console.log("User data stored after registration:", userData);
-        } else {
-          console.warn("Missing user or patient data in registration response:", data);
         }
       }
       
       return response.data;
     } catch (error) {
-      console.error('Registration error:', error);
       throw error;
     }
   },
@@ -152,7 +135,6 @@ const authService = {
       const response = await api.get('/auth/profile');
       return response.data;
     } catch (error) {
-      console.error('Get profile error:', error);
       throw error;
     }
   },
@@ -167,7 +149,6 @@ const authService = {
       const response = await api.put('/auth/profile', userData);
       return response.data;
     } catch (error) {
-      console.error('Update profile error:', error);
       throw error;
     }
   },

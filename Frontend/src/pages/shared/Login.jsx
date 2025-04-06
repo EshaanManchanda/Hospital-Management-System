@@ -1,13 +1,14 @@
 import React, { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { HeartPulse } from "lucide-react";
 import { FaHospital, FaUserMd, FaLaptopMedical, FaShieldAlt } from "react-icons/fa";
 import LoginForm from "../../components/shared/LoginForm";
-import { setEmergencyAdminAccess } from "../../utils/debugUtils";
+import { authService } from "../../services/authService";
 
 const Login = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [showHint, setShowHint] = useState(false);
   
   // Check if there's a success message from registration
@@ -16,9 +17,31 @@ const Login = () => {
 
   const handleDebugAdminAccess = (e) => {
     e.preventDefault();
-    // Use emergency admin access and redirect
-    setEmergencyAdminAccess();
-    window.location.href = '/admin';
+    
+    console.log("Emergency admin access activated");
+    
+    // Direct admin credentials setup
+    const adminCredentials = {
+      userId: 'admin123',
+      name: 'Admin User',
+      email: 'admin@example.com',
+      role: 'admin'
+    };
+    
+    // Set credentials in localStorage
+    localStorage.setItem('token', 'emergency-admin-token');
+    localStorage.setItem('userRole', 'admin');
+    localStorage.setItem('userData', JSON.stringify(adminCredentials));
+    
+    // Log the current authentication state for debugging
+    console.log("Auth state after setting credentials:");
+    console.log("- isAuthenticated:", authService.isAuthenticated());
+    console.log("- userRole:", authService.getUserRole());
+    console.log("- userData:", authService.getUserData());
+    
+    // Force direct navigation to admin dashboard
+    console.log("Redirecting to admin dashboard...");
+    window.location.href = '/admin-dashboard';
   };
 
   return (

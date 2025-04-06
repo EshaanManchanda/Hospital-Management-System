@@ -72,16 +72,42 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   const isAuthenticated = authService.isAuthenticated();
   const userRole = authService.getUserRole();
   
+  console.log("ProtectedRoute - Auth check:", { 
+    isAuthenticated, 
+    userRole, 
+    allowedRoles,
+    currentPath: window.location.pathname 
+  });
+
   // If not authenticated, redirect to login
   if (!isAuthenticated) {
+    console.log("ProtectedRoute - Not authenticated, redirecting to login");
     return <Navigate to="/login" replace />;
   }
   
   // If roles are specified and user's role is not included, redirect based on their role
   if (allowedRoles.length > 0 && !allowedRoles.includes(userRole)) {
+    console.log(`ProtectedRoute - Role ${userRole} not allowed. Allowed roles:`, allowedRoles);
+    
+    // Redirect to appropriate dashboard based on their role
+    if (userRole === 'admin') {
+      console.log("ProtectedRoute - Admin role detected, redirecting to admin dashboard");
+      // Use direct browser navigation for admin to ensure complete page reload
+      window.location.href = '/admin-dashboard';
+      return null;
+    } else if (userRole === 'doctor') {
+      console.log("ProtectedRoute - Doctor role detected, redirecting to doctor dashboard");
+      return <Navigate to="/doctor-dashboard" replace />;
+    } else if (userRole === 'patient') {
+      console.log("ProtectedRoute - Patient role detected, redirecting to patient dashboard");
+      return <Navigate to="/patient-dashboard" replace />;
+    }
+    
+    console.log("ProtectedRoute - Unknown role, redirecting to home");
     return <Navigate to="/" replace />;
   }
   
+  console.log("ProtectedRoute - Access granted");
   return children;
 };
 
@@ -90,18 +116,26 @@ const DashboardRedirect = () => {
   const isAuthenticated = authService.isAuthenticated();
   const userRole = authService.getUserRole();
   
+  console.log("DashboardRedirect - Auth check:", { isAuthenticated, userRole });
+  
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
   
   // Redirect to appropriate dashboard based on role
-  if (userRole === "patient") {
-    return <Navigate to="/patient-dashboard" replace />;
+  if (userRole === "admin") {
+    // For admin users, use direct navigation to ensure proper loading
+    console.log("DashboardRedirect - Redirecting admin to admin dashboard");
+    window.location.href = '/admin-dashboard';
+    return null;
   } else if (userRole === "doctor") {
+    console.log("DashboardRedirect - Redirecting doctor to doctor dashboard");
     return <Navigate to="/doctor-dashboard" replace />;
-  } else if (userRole === "admin") {
-    return <Navigate to="/admin-dashboard" replace />;
+  } else if (userRole === "patient") {
+    console.log("DashboardRedirect - Redirecting patient to patient dashboard");
+    return <Navigate to="/patient-dashboard" replace />;
   } else {
+    console.log("DashboardRedirect - Unknown role, redirecting to home");
     return <Navigate to="/" replace />;
   }
 };

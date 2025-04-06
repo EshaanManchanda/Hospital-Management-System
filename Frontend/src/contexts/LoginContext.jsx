@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect } from "react";
 import { authService } from "../services";
+import { useNavigate } from "react-router-dom";
 
 // Create the login context with default values
 const LoginContext = createContext({
@@ -44,13 +45,32 @@ export const LoginProvider = ({ children }) => {
   // Login function
   const login = async (email, password) => {
     try {
+      console.log("LoginContext: Attempting login for:", email);
       const response = await authService.login(email, password);
       setIsLoggedIn(true);
-      setUserRole(authService.getUserRole());
-      setUserData(authService.getUserData());
-      return response;
+      
+      // Get the user role from auth service or directly from response
+      const role = response.role || 
+                   (response.user && response.user.role) || 
+                   authService.getUserRole();
+      
+      console.log("LoginContext: Role after login:", role);
+      
+      // Set the role in state
+      setUserRole(role);
+      
+      // Set user data
+      const userData = authService.getUserData();
+      setUserData(userData);
+      
+      console.log("LoginContext: User data after login:", userData);
+      
+      return {
+        ...response,
+        role: role
+      };
     } catch (error) {
-      console.error("Login error:", error);
+      console.error("LoginContext: Login error:", error);
       throw error;
     }
   };

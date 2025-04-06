@@ -56,6 +56,16 @@ const ProtectedRoute = ({ children, allowedRoles = [] }: ProtectedRouteProps) =>
   
   // If roles are specified and user's role is not included, redirect based on their role
   if (allowedRoles.length > 0 && !allowedRoles.includes(userRole)) {
+    // Redirect to appropriate dashboard based on their role
+    if (userRole === 'admin') {
+      window.location.href = '/admin-dashboard';
+      return null;
+    } else if (userRole === 'doctor') {
+      return <Navigate to="/doctor-dashboard" replace />;
+    } else if (userRole === 'patient') {
+      return <Navigate to="/patient-dashboard" replace />;
+    }
+    
     return <Navigate to="/" replace />;
   }
   
@@ -72,12 +82,12 @@ const DashboardRedirect = () => {
   }
   
   // Redirect to appropriate dashboard based on role
-  if (userRole === "patient") {
-    return <Navigate to="/patient-dashboard" replace />;
+  if (userRole === "admin") {
+    return <Navigate to="/admin-dashboard" replace />;
   } else if (userRole === "doctor") {
     return <Navigate to="/doctor-dashboard" replace />;
-  } else if (userRole === "admin") {
-    return <Navigate to="/admin-dashboard" replace />;
+  } else if (userRole === "patient") {
+    return <Navigate to="/patient-dashboard" replace />;
   } else {
     return <Navigate to="/" replace />;
   }

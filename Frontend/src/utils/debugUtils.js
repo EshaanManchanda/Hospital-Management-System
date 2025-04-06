@@ -14,12 +14,16 @@ export const setEmergencyAdminAccess = () => {
     role: 'admin'
   };
   
+  console.log("Setting emergency admin credentials in localStorage");
+  
   // Set in localStorage
   localStorage.setItem('token', 'emergency-admin-token');
   localStorage.setItem('userRole', 'admin');
   localStorage.setItem('userData', JSON.stringify(adminCredentials));
   
-  console.log('Emergency admin access granted:', adminCredentials);
+  console.log("Admin credentials set. Ready for redirection.");
+  
+  // Return the credentials, let the caller handle redirection
   return adminCredentials;
 };
 
@@ -30,7 +34,6 @@ export const clearAuthData = () => {
   localStorage.removeItem('token');
   localStorage.removeItem('userRole');
   localStorage.removeItem('userData');
-  console.log('Auth data cleared from localStorage');
 };
 
 /**
@@ -60,7 +63,6 @@ export const debugProtectedRoute = () => {
                      window.location.pathname === '/profile'
   };
   
-  console.log('Protected route debug:', status);
   return status;
 };
 
