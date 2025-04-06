@@ -6,7 +6,6 @@ const bedSchema = mongoose.Schema(
       type: String,
       required: true,
       unique: true,
-      index: false,
     },
     ward: {
       type: String,
@@ -54,7 +53,6 @@ const bedSchema = mongoose.Schema(
 
 // Create index for faster queries
 bedSchema.index({ ward: 1, status: 1 });
-bedSchema.index({ bedNumber: 1 });
 
 // Static method to get bed statistics
 bedSchema.statics.getBedStats = async function() {
