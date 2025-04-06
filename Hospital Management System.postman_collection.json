@@ -1,0 +1,175 @@
+{
+	"info": {
+		"_postman_id": "34eaac0b-e2b5-469d-9640-e840297315d8",
+		"name": "Hospital Management System",
+		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json",
+		"_exporter_id": "30269521"
+	},
+	"item": [
+		{
+			"name": "Register User",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"name\": \"John Doe\",\r\n  \"email\": \"john@example.com\",\r\n  \"password\": \"password123\",\r\n  \"role\": \"patient\",\r\n  \"mobile\": \"1234567890\",\r\n  \"gender\": \"male\",\r\n  \"dateOfBirth\": \"1990-01-01\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": "http://127.0.0.1:5000/api/auth/register"
+			},
+			"response": []
+		},
+		{
+			"name": "Register User Doctor",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": {
+						"token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3ZjE3MzI0ZWQxYjVmYTdhYTM3YmI4OSIsImlhdCI6MTc0Mzg3NjkwMCwiZXhwIjoxNzQ2NDY4OTAwfQ.wiPe1kjRVJFpUC5s6-Hyb3yzy_RPz_-9h1rBJl4twgA"
+					}
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"name\": \"Dr. Shaan Arora\",\r\n  \"email\": \"shaanarora76@gmail.com\",\r\n  \"password\": \"securePassword123\",\r\n  \"mobile\": \"9876543210\",\r\n  \"gender\": \"male\",\r\n  \"dateOfBirth\": \"1985-05-15\",\r\n  \"specialization\": \"Cardiologist\",\r\n  \"experience\": 10,\r\n  \"fee\": 100,\r\n  \"about\": \"Experienced cardiologist with a focus on heart health.\",\r\n  \"workingHours\": {\r\n    \"start\": \"09:00\",\r\n    \"end\": \"17:00\"\r\n  },\r\n  \"workingDays\": [\"Monday\", \"Tuesday\", \"Wednesday\", \"Thursday\", \"Friday\"],\r\n  \"qualifications\": [\r\n    {\r\n      \"degree\": \"MD\",\r\n      \"institution\": \"Harvard Medical School\",\r\n      \"year\": 2010\r\n    }\r\n  ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": "http://127.0.0.1:5000/api/doctors"
+			},
+			"response": []
+		},
+		{
+			"name": "Register User Patient",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"name\": \"John Doe\",\r\n  \"email\": \"john.doe@example.com\",\r\n  \"gender\": \"male\",\r\n  \"mobile\": \"1234567890\",\r\n  \"age\": 30,\r\n  \"password\": \"securePassword123\",\r\n  \"bloodGroup\": \"O+\",\r\n  \"height\": 175,\r\n  \"weight\": 70\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": "http://127.0.0.1:5000/api/patients/register"
+			},
+			"response": []
+		},
+		{
+			"name": "Login User",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"email\": \"john@example.com\",\r\n  \"password\": \"password123\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": "http://127.0.0.1:5000/api/auth/login"
+			},
+			"response": []
+		},
+		{
+			"name": "get all patients",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": {
+						"token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3ZjE3MzI0ZWQxYjVmYTdhYTM3YmI4OSIsImlhdCI6MTc0Mzg3NjkwMCwiZXhwIjoxNzQ2NDY4OTAwfQ.wiPe1kjRVJFpUC5s6-Hyb3yzy_RPz_-9h1rBJl4twgA"
+					}
+				},
+				"method": "GET",
+				"header": [],
+				"url": "http://127.0.0.1:5000/api/patients"
+			},
+			"response": []
+		},
+		{
+			"name": "get all doctors",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": {
+						"token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3ZjE3MzI0ZWQxYjVmYTdhYTM3YmI4OSIsImlhdCI6MTc0Mzg3NjkwMCwiZXhwIjoxNzQ2NDY4OTAwfQ.wiPe1kjRVJFpUC5s6-Hyb3yzy_RPz_-9h1rBJl4twgA"
+					}
+				},
+				"method": "GET",
+				"header": [],
+				"url": "http://127.0.0.1:5000/api/doctors"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Patitent by ID",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": {
+						"token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3ZjE3MzI0ZWQxYjVmYTdhYTM3YmI4OSIsImlhdCI6MTc0Mzg3NjkwMCwiZXhwIjoxNzQ2NDY4OTAwfQ.wiPe1kjRVJFpUC5s6-Hyb3yzy_RPz_-9h1rBJl4twgA"
+					}
+				},
+				"method": "GET",
+				"header": [],
+				"url": "http://127.0.0.1:5000/api/patients/67f17888dd9f28b38c801f35"
+			},
+			"response": []
+		},
+		{
+			"name": "Register User Admin",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"name\": \"Eshaan Manchanda\",\r\n  \"email\": \"eshaanmanchanda01@gmail.com\",\r\n  \"password\": \"password123\",\r\n  \"role\": \"admin\",\r\n  \"mobile\": \"1234567890\",\r\n  \"gender\": \"male\",\r\n  \"dateOfBirth\": \"1990-01-01\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": "http://127.0.0.1:5000/api/auth/register"
+			},
+			"response": []
+		},
+		{
+			"name": "Make an appointment",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": {
+						"token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3ZjE3N2QyZGQ5ZjI4YjM4YzgwMWYzMCIsImlhdCI6MTc0Mzg4MDk2NCwiZXhwIjoxNzQ2NDcyOTY0fQ.4jLlemAKUm8j0vNDgFRaPjYPLHejLU1QDO6miSjvWN0"
+					}
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"doctorId\": \"67f181bd797eba11169d595d\",  // Ensure this ID is correct\r\n  \"date\": \"2023-06-20\",\r\n  \"time\": \"09:00\",\r\n  \"type\": \"consultation\",\r\n  \"description\": \"Routine checkup\",\r\n  \"symptoms\": \"No symptoms reported\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": "http://127.0.0.1:5000/api/appointments"
+			},
+			"response": []
+		}
+	]
+}
