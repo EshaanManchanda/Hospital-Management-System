@@ -48,27 +48,28 @@ interface ProtectedRouteProps {
 const ProtectedRoute = ({ children, allowedRoles = [] }: ProtectedRouteProps) => {
   const isAuthenticated = authService.isAuthenticated();
   const userRole = authService.getUserRole();
-  
+
+  console.log("ProtectedRoute", { isAuthenticated, userRole, allowedRoles });
+
   // If not authenticated, redirect to login
   if (!isAuthenticated) {
+    console.log("Redirecting to login");
     return <Navigate to="/login" replace />;
   }
-  
+
   // If roles are specified and user's role is not included, redirect based on their role
   if (allowedRoles.length > 0 && !allowedRoles.includes(userRole)) {
-    // Redirect to appropriate dashboard based on their role
-    if (userRole === 'admin') {
-      window.location.href = '/admin-dashboard';
+    console.log(`Redirecting based on role: ${userRole}`);
+    if (userRole === "admin") {
+      window.location.href = "/admin-dashboard";
       return null;
-    } else if (userRole === 'doctor') {
+    } else if (userRole === "doctor") {
       return <Navigate to="/doctor-dashboard" replace />;
-    } else if (userRole === 'patient') {
+    } else if (userRole === "patient") {
       return <Navigate to="/patient-dashboard" replace />;
     }
-    
-    return <Navigate to="/" replace />;
   }
-  
+
   return <>{children}</>;
 };
 
