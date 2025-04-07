@@ -5,12 +5,6 @@
       "destination": "/"
     }
   ],
-  "routes": [
-    {
-      "src": "/[^.]+",
-      "dest": "/"
-    }
-  ],
   "builds": [
     {
       "src": "package.json",
