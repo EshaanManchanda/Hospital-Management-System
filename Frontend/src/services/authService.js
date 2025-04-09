@@ -73,45 +73,123 @@ const login = async (emailOrData, password) => {
       loginPassword = password;
     }
 
+    // Debug output - sanitize password for logging
+    console.log('Login attempt with:', { 
+      email, 
+      passwordProvided: !!loginPassword,
+      linkGoogleAccount
+    });
+
     const requestData = { email, password: loginPassword };
     if (linkGoogleAccount) {
       requestData.linkGoogleAccount = true;
     }
 
-    const response = await api.post('/api/auth/login', requestData);
-    const data = response.data;
-
-    if (!data || !data.success) {
-      throw new Error(data?.message || 'Login failed');
+    console.log('Sending login request to API endpoint: /api/auth/login');
+    
+    try {
+      // First try with '/api/auth/login' path (standard format)
+      const response = await api.post('/api/auth/login', requestData);
+      const data = response.data;
+      
+      console.log('Login response received:', { 
+        success: data?.success, 
+        hasToken: !!data?.token,
+        message: data?.message 
+      });
+      
+      if (!data || !data.success) {
+        throw new Error(data?.message || 'Login failed');
+      }
+      
+      if (!data.token) {
+        throw new Error('No authentication token received');
+      }
+      
+      // Validate token format
+      if (!validateToken(data.token)) {
+        console.error('Received invalid token format from server');
+        throw new Error('Invalid authentication token format');
+      }
+      
+      const userData = {
+        userId: data.user.id || data.user._id,
+        name: data.user.name,
+        email: data.user.email,
+        role: data.user.role,
+      };
+      
+      // Store token and user data
+      localStorage.setItem('token', data.token);
+      console.log('Stored token:', data.token.substring(0, 20) + '...');
+      localStorage.setItem('userData', JSON.stringify(userData));
+      api.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
+      
+      return { success: true, data: { token: data.token, user: userData } };
+    } catch (authError) {
+      console.error('Login error (first attempt):', authError);
+      
+      // If the first attempt fails, try without the /api prefix
+      // This is a fallback for servers configured differently
+      if (authError.response?.status === 404) {
+        console.log('Trying alternative API endpoint: /auth/login');
+        try {
+          const altResponse = await api.post('/auth/login', requestData);
+          const altData = altResponse.data;
+          
+          console.log('Alternative login response:', altData);
+          
+          if (!altData || !altData.success) {
+            throw new Error(altData?.message || 'Login failed');
+          }
+          
+          if (!altData.token) {
+            throw new Error('No authentication token received');
+          }
+          
+          // Validate token format
+          if (!validateToken(altData.token)) {
+            console.error('Received invalid token format from server');
+            throw new Error('Invalid authentication token format');
+          }
+          
+          const userData = {
+            userId: altData.user.id || altData.user._id,
+            name: altData.user.name,
+            email: altData.user.email,
+            role: altData.user.role,
+          };
+          
+          // Store token and user data
+          localStorage.setItem('token', altData.token);
+          console.log('Stored token (alt path):', altData.token.substring(0, 20) + '...');
+          localStorage.setItem('userData', JSON.stringify(userData));
+          api.defaults.headers.common['Authorization'] = `Bearer ${altData.token}`;
+          
+          return { success: true, data: { token: altData.token, user: userData } };
+        } catch (altError) {
+          console.error('Login error (alternative attempt):', altError);
+          throw altError; // Rethrow the alternative error
+        }
+      }
+      throw authError; // Rethrow the original error if not a 404
     }
-
-    if (!data.token) {
-      throw new Error('No authentication token received');
+  } catch (error) {
+    console.error('Login error details:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status
+    });
+    
+    if (error.response?.status === 401) {
+      return { success: false, message: 'Invalid email or password' };
     }
     
-    // Validate token format
-    if (!validateToken(data.token)) {
-      console.error('Received invalid token format from server');
-      throw new Error('Invalid authentication token format');
+    if (error.response?.status === 404) {
+      return { success: false, message: 'Authentication service not available. Please check the backend server configuration.' };
     }
-
-    const userData = {
-      userId: data.user.id || data.user._id,
-      name: data.user.name,
-      email: data.user.email,
-      role: data.user.role,
-    };
-
-    // Store token and user data
-    localStorage.setItem('token', data.token);
-    console.log('Stored token:', data.token.substring(0, 20) + '...');
-    localStorage.setItem('userData', JSON.stringify(userData));
-    api.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
-
-    return { success: true, data: { token: data.token, user: userData } };
-  } catch (error) {
-    console.error('Login error:', error);
-    return { success: false, message: error.message };
+    
+    return { success: false, message: error.message || 'Login failed' };
   }
 };
 

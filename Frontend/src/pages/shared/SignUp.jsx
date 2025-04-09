@@ -20,6 +20,7 @@ const SignUp = () => {
     bloodGroup: "",
     height: "",
     weight: "",
+    role: "patient",
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -106,7 +107,7 @@ const SignUp = () => {
         name: formData.fullName,
         email: formData.email,
         gender: formData.gender,
-        // Optional fields
+        role: "patient",
         password: formData.password,
         mobile: formData.phoneNumber,
         age: formData.age,
@@ -115,7 +116,12 @@ const SignUp = () => {
         weight: formData.weight,
       };
 
+      console.log("Registering with data:", { ...patientData, password: patientData.password ? '********' : undefined });
       const data = await authService.register(patientData);
+      
+      if (!data.success) {
+        throw new Error(data.message || "Registration failed. Please try again.");
+      }
       
       toast.success("Registration successful! Please login with your credentials.");
       navigate("/login", { 
@@ -137,14 +143,13 @@ const SignUp = () => {
       setIsLoading(true);
       setError("");
       
-      console.log("Initiating Google OAuth flow for signup");
+      console.log("Initiating Google OAuth flow for patient signup");
       
       // Store a flag to indicate we're in the signup flow
       sessionStorage.setItem('googleSignupFlow', 'true');
       
-      // Call initiateGoogleLogin from GoogleAuthContext
-      // This will redirect the user to Google's OAuth page
-      await initiateGoogleLogin();
+      // Call initiateGoogleLogin from GoogleAuthContext with the patient role
+      await initiateGoogleLogin("patient");
       
       // The rest of the auth flow will be handled by the GoogleOAuthCallback component
       // when Google redirects back to our callback URL

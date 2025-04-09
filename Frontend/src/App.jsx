@@ -23,7 +23,6 @@ import { Provider } from 'react-redux';
 import store from './store';
 import { toast } from 'react-hot-toast';
 import ProtectedRoute from "./components/shared/ProtectedRoute";
-import AuthDebugger from './components/shared/AuthDebugger';
 import DashboardRedirect from './components/DashboardRedirect';
 import { useDispatch } from 'react-redux';
 
@@ -261,7 +260,6 @@ const AppContent = () => {
       <ReactHotToastToaster position="top-right" />
       <Toaster />
       <Sonner />
-      <AuthDebugger />
     </>
   );
 };

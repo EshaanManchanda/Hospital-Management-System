@@ -61,6 +61,12 @@ const LoginForm = () => {
     try {
       console.log('Attempting login with email/password');
       
+      // Display current API configuration in console for debugging
+      console.log('Current API configuration:', {
+        url: window.location.origin,
+        apiBaseUrl: import.meta.env.VITE_API_URL || 'Default: http://localhost:5000'
+      });
+      
       // If linkGoogleAccount is true, we'll add a parameter to indicate this in the login request
       const loginParams = { 
         email, 
@@ -69,8 +75,10 @@ const LoginForm = () => {
       };
       
       const response = await authService.login(loginParams);
+      console.log('Login response:', response);
       
       if (!response.success) {
+        console.log('Login failed with response:', response);
         throw new Error(response.message || 'Login failed');
       }
 
@@ -119,18 +127,40 @@ const LoginForm = () => {
       console.error('Login error:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Login failed';
       
-      // Handle specific error cases
+      // Enhanced error handling with more specific messages
       if (error.response?.status === 401) {
-        setErrors({ form: 'Invalid email or password' });
+        setErrors({ form: 'Invalid email or password. Please check your credentials and try again.' });
+        toast.error('Invalid email or password');
       } else if (error.response?.status === 403) {
         setErrors({ form: 'Account is locked. Please contact support.' });
+        toast.error('Account is locked');
       } else if (error.response?.status === 404) {
-        setErrors({ form: 'Account not found' });
+        setErrors({ 
+          form: 'Authentication service not available. Please check if the backend server is running.' 
+        });
+        toast.error('Backend server not available');
+      } else if (error.message.includes('Network Error')) {
+        setErrors({ 
+          form: 'Network error: Cannot connect to the server. Please check your internet connection and make sure the backend is running.' 
+        });
+        toast.error('Cannot connect to server');
       } else {
         setErrors({ form: errorMessage });
+        toast.error(errorMessage);
       }
       
-      toast.error(errorMessage);
+      // Add a diagnostic button for backend connectivity issues
+      if (error.response?.status === 404 || error.message.includes('Network Error')) {
+        // Create a method to test backend connection
+        setTimeout(() => {
+          console.log('Backend connectivity issues detected. Providing diagnostic information...');
+          console.log('Current environment:', {
+            nodeEnv: import.meta.env.NODE_ENV,
+            apiUrl: import.meta.env.VITE_API_URL || 'Not set (using default)',
+            baseUrl: window.location.origin
+          });
+        }, 500);
+      }
     } finally {
       setLoading(false);
     }

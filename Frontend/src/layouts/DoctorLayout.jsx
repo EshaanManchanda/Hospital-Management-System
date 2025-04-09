@@ -1,15 +1,21 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { authService } from '../services';
+import { useAuth } from '../contexts/AuthContext';
 
 const DoctorLayout = ({ children }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const location = useLocation();
   const navigate = useNavigate();
+  const { logout } = useAuth();
 
-  const handleLogout = () => {
-    authService.logout();
-    navigate('/login');
+  const handleLogout = async () => {
+    try {
+      await logout();
+      // Redirection to home page is handled in the AuthContext
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
   };
 
   const menuItems = [

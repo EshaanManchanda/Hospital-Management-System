@@ -20,12 +20,14 @@ import {
   ChevronRight
 } from "lucide-react";
 import { authService } from "../services";
+import { useAuth } from "../contexts/AuthContext";
 import { FaTwitter, FaFacebookF, FaInstagram, FaLinkedinIn } from 'react-icons/fa';
 import Logo from '@/assets/logo.svg';
 
 const PatientLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [notificationsCount, setNotificationsCount] = useState(3);
@@ -61,9 +63,13 @@ const PatientLayout = () => {
     setSidebarOpen(!sidebarOpen);
   };
 
-  const handleLogout = () => {
-    authService.logout();
-    navigate("/login");
+  const handleLogout = async () => {
+    try {
+      await logout();
+      // Navigation is handled in the AuthContext
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
   };
 
   const navItems = [
