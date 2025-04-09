@@ -1,19 +1,55 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { HeartPulse } from "lucide-react";
-import { FaHospital, FaUserMd, FaLaptopMedical, FaShieldAlt } from "react-icons/fa";
+import { FaHospital, FaUserMd, FaLaptopMedical, FaShieldAlt, FaGoogle } from "react-icons/fa";
 import LoginForm from "../../components/shared/LoginForm";
-import { authService } from "../../services/authService";
+import { useAuth } from '../../contexts/AuthContext';
+import { useGoogleAuth } from '../../contexts/GoogleAuthContext';
+import authService from '../../services/authService';
+import { toast } from 'react-hot-toast';
 
 const Login = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [showHint, setShowHint] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  
+  // Get Google auth methods from context
+  const { initiateGoogleLogin, loading } = useGoogleAuth();
   
   // Check if there's a success message from registration
   const registrationSuccess = location.state?.success;
   const successMessage = location.state?.message;
+
+  // Check for error in URL params
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const error = urlParams.get('error');
+    
+    if (error) {
+      console.error('Authentication error:', error);
+    }
+  }, []);
+
+  // Google login handler
+  const handleGoogleLogin = async () => {
+    try {
+      setIsGoogleLoading(true);
+      console.log("Initiating Google login flow from shared Login page");
+      
+      // This will redirect the user to Google's authorization page
+      await initiateGoogleLogin();
+      
+      // The rest of the auth flow will be handled by the GoogleOAuthCallback component
+      // when Google redirects back to our callback URL
+    } catch (error) {
+      console.error('Google login error:', error);
+      toast.error(error.message || 'Failed to login with Google');
+      setIsGoogleLoading(false);
+    }
+    // We don't set loading to false on success because the page will redirect
+  };
 
   const handleDebugAdminAccess = (e) => {
     e.preventDefault();
@@ -83,6 +119,39 @@ const Login = () => {
               </div>
             </motion.div>
           )}
+
+          {/* Google Sign-in Button */}
+          <div className="space-y-4">
+            <motion.button
+              onClick={handleGoogleLogin}
+              disabled={isGoogleLoading || loading}
+              className="w-full flex items-center justify-center space-x-2 bg-white border-2 border-gray-300 text-gray-800 font-medium py-3 px-4 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition duration-300"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              type="button"
+            >
+              {isGoogleLoading || loading ? (
+                <svg className="animate-spin h-5 w-5 text-gray-800" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              ) : (
+                <>
+                  <FaGoogle className="text-xl text-blue-600" />
+                  <span>Sign in with Google</span>
+                </>
+              )}
+            </motion.button>
+            
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500">Or continue with</span>
+              </div>
+            </div>
+          </div>
 
           {/* Use the shared login form component */}
           <LoginForm />

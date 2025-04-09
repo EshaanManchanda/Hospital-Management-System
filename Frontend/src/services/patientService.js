@@ -12,7 +12,7 @@ const patientService = {
    */
   getAllPatients: async (page = 1, limit = 10) => {
     try {
-      const response = await api.get(`/patients?page=${page}&limit=${limit}`);
+      const response = await api.get(`/api/patients?page=${page}&limit=${limit}`);
       return response.data;
     } catch (error) {
       console.error('Get patients error:', error);
@@ -28,7 +28,7 @@ const patientService = {
   getPatientById: async (id) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await api.get(`/patients/${id}`, {
+      const response = await api.get(`/api/patients/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -49,7 +49,7 @@ const patientService = {
    */
   getPatientsByDoctor: async (doctorId, page = 1, limit = 10) => {
     try {
-      const response = await api.get(`/patients/doctor/${doctorId}?page=${page}&limit=${limit}`);
+      const response = await api.get(`/api/patients/doctor/${doctorId}?page=${page}&limit=${limit}`);
       return response.data;
     } catch (error) {
       console.error('Get patients by doctor error:', error);
@@ -65,7 +65,7 @@ const patientService = {
    */
   updatePatient: async (id, patientData) => {
     try {
-      const response = await api.put(`/patients/${id}`, patientData);
+      const response = await api.put(`/api/patients/${id}`, patientData);
       return response.data;
     } catch (error) {
       console.error('Update patient error:', error);
@@ -81,7 +81,7 @@ const patientService = {
    */
   addMedicalHistory: async (id, medicalHistoryData) => {
     try {
-      const response = await api.post(`/patients/${id}/medical-history`, medicalHistoryData);
+      const response = await api.post(`/api/patients/${id}/medical-history`, medicalHistoryData);
       return response.data;
     } catch (error) {
       console.error('Add medical history error:', error);
@@ -97,7 +97,7 @@ const patientService = {
    */
   addMedication: async (id, medicationData) => {
     try {
-      const response = await api.post(`/patients/${id}/medications`, medicationData);
+      const response = await api.post(`/api/patients/${id}/medications`, medicationData);
       return response.data;
     } catch (error) {
       console.error('Add medication error:', error);
@@ -113,7 +113,7 @@ const patientService = {
    */
   addMedicalReport: async (id, reportData) => {
     try {
-      const response = await api.post(`/patients/${id}/reports`, reportData);
+      const response = await api.post(`/api/patients/${id}/reports`, reportData);
       return response.data;
     } catch (error) {
       console.error('Add medical report error:', error);

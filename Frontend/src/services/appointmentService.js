@@ -12,7 +12,7 @@ const appointmentService = {
    */
   getAllAppointments: async (page = 1, limit = 10) => {
     try {
-      const response = await api.get(`/appointments?page=${page}&limit=${limit}`);
+      const response = await api.get(`/api/appointments?page=${page}&limit=${limit}`);
       return response.data;
     } catch (error) {
       console.error('Get appointments error:', error);
@@ -27,7 +27,7 @@ const appointmentService = {
    */
   getAppointmentById: async (id) => {
     try {
-      const response = await api.get(`/appointments/${id}`);
+      const response = await api.get(`/api/appointments/${id}`);
       return response.data;
     } catch (error) {
       console.error('Get appointment error:', error);
@@ -42,7 +42,7 @@ const appointmentService = {
    */
   createAppointment: async (appointmentData) => {
     try {
-      const response = await api.post('/appointments', appointmentData);
+      const response = await api.post('/api/appointments', appointmentData);
       return response.data;
     } catch (error) {
       console.error('Create appointment error:', error);
@@ -58,7 +58,7 @@ const appointmentService = {
    */
   updateAppointment: async (id, appointmentData) => {
     try {
-      const response = await api.put(`/appointments/${id}`, appointmentData);
+      const response = await api.put(`/api/appointments/${id}`, appointmentData);
       return response.data;
     } catch (error) {
       console.error('Update appointment error:', error);
@@ -73,7 +73,7 @@ const appointmentService = {
    */
   deleteAppointment: async (id) => {
     try {
-      const response = await api.delete(`/appointments/${id}`);
+      const response = await api.delete(`/api/appointments/${id}`);
       return response.data;
     } catch (error) {
       console.error('Delete appointment error:', error);
@@ -90,7 +90,7 @@ const appointmentService = {
    */
   getDoctorAppointments: async (doctorId, page = 1, limit = 10) => {
     try {
-      const response = await api.get(`/appointments/doctor/${doctorId}?page=${page}&limit=${limit}`);
+      const response = await api.get(`/api/appointments/doctor/${doctorId}?page=${page}&limit=${limit}`);
       return response.data;
     } catch (error) {
       console.error('Get doctor appointments error:', error);
@@ -119,7 +119,7 @@ const appointmentService = {
       // Make the API request with the authorization header
       // The backend filters appointments for the authenticated patient in the /appointments endpoint
       // So we use the main appointments endpoint instead of a patient-specific one
-      const response = await api.get(`/appointments?page=${page}&limit=${limit}`, {
+      const response = await api.get(`/api/appointments?page=${page}&limit=${limit}`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -134,7 +134,7 @@ const appointmentService = {
         status: error.response?.status,
         statusText: error.response?.statusText,
         responseData: error.response?.data,
-        endpoint: `/appointments?page=${page}&limit=${limit}`
+        endpoint: `/api/appointments?page=${page}&limit=${limit}`
       });
       throw error;
     }
@@ -148,7 +148,7 @@ const appointmentService = {
    */
   getAvailableTimeSlots: async (doctorId, date) => {
     try {
-      const response = await api.get(`/appointments/available-slots/${doctorId}/${date}`);
+      const response = await api.get(`/api/appointments/available-slots/${doctorId}/${date}`);
       return response.data;
     } catch (error) {
       console.error('Get available time slots error:', error);

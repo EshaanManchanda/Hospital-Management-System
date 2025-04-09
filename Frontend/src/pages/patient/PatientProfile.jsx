@@ -1,14 +1,36 @@
 import React, { useState, useEffect } from "react";
 import { User, Mail, Phone, MapPin, Calendar, Edit, Save, X, Loader2 } from "lucide-react";
 import { authService, patientService } from "../../services";
+import { useNavigate, useLocation } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
+import api from '../../utils/api';
+import { FaUser, FaWeight, FaRulerVertical, FaTint } from 'react-icons/fa';
 
 const PatientProfile = () => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [editing, setEditing] = useState(false);
-  const [formData, setFormData] = useState({});
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    birthdate: '',
+    gender: '',
+    bloodGroup: '',
+    height: '',
+    weight: '',
+    allergies: '',
+    chronicDiseases: ''
+  });
   const [saveLoading, setSaveLoading] = useState(false);
+
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Check if this is a setup mode (from Google OAuth)
+  const isSetupMode = new URLSearchParams(location.search).get('setup') === 'true';
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -33,17 +55,29 @@ const PatientProfile = () => {
           height: response.data.height || "",
           weight: response.data.weight || "",
           allergies: response.data.allergies?.join(", ") || "",
+          chronicDiseases: response.data.chronicDiseases?.join(", ") || ""
         });
+        
+        // If in setup mode, automatically go into editing mode
+        if (isSetupMode) {
+          setEditing(true);
+          toast.info('Please complete your profile information. Required fields are marked with *', { duration: 5000 });
+        }
       } catch (err) {
         console.error("Error fetching profile:", err);
         setError("Failed to load profile data");
+        
+        // If in setup mode, don't show error as the profile doesn't exist yet
+        if (!isSetupMode) {
+          toast.error('Failed to load profile');
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchProfile();
-  }, []);
+  }, [isSetupMode]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -53,32 +87,43 @@ const PatientProfile = () => {
   const handleSave = async () => {
     try {
       setSaveLoading(true);
-      // Here you would normally call the API to update the profile
-      // For now we'll just simulate a delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Convert comma-separated strings to arrays
+      const allergiesArray = formData.allergies ? formData.allergies.split(',').map(item => item.trim()) : [];
+      const chronicDiseasesArray = formData.chronicDiseases ? formData.chronicDiseases.split(',').map(item => item.trim()) : [];
       
-      // Update the profile state with the form data
-      setProfile(prev => ({
-        ...prev,
-        user: {
-          ...prev.user,
-          name: formData.name,
-          email: formData.email,
-        },
-        contactNumber: formData.phone,
-        address: formData.address,
-        dateOfBirth: formData.birthdate,
-        gender: formData.gender,
+      // Create/update profile data
+      const profileData = {
         bloodGroup: formData.bloodGroup,
-        height: formData.height,
-        weight: formData.weight,
-        allergies: formData.allergies.split(",").map(a => a.trim()),
-      }));
+        height: parseInt(formData.height),
+        weight: parseInt(formData.weight),
+        allergies: allergiesArray,
+        chronicDiseases: chronicDiseasesArray
+      };
       
-      setEditing(false);
+      let response;
+      if (profile?._id) {
+        // Update existing profile
+        response = await api.put('/api/patients/profile', profileData);
+      } else {
+        // Create new profile
+        response = await api.post('/api/patients/profile', profileData);
+      }
+      
+      if (response.data.success) {
+        toast.success('Profile updated successfully');
+        setEditing(false);
+        fetchProfile();
+        
+        // If this was the initial setup, redirect to the dashboard
+        if (isSetupMode) {
+          navigate('/patient-dashboard');
+        }
+      } else {
+        toast.error(response.data.message || 'Failed to update profile');
+      }
     } catch (err) {
-      console.error("Error saving profile:", err);
-      // Show error to user
+      console.error('Error updating profile:', err);
+      toast.error('Failed to update profile. Please try again.');
     } finally {
       setSaveLoading(false);
     }
@@ -97,6 +142,7 @@ const PatientProfile = () => {
       height: profile.height || "",
       weight: profile.weight || "",
       allergies: profile.allergies?.join(", ") || "",
+      chronicDiseases: profile.chronicDiseases?.join(", ") || ""
     });
     setEditing(false);
   };
@@ -132,8 +178,10 @@ const PatientProfile = () => {
         {/* Profile Header */}
         <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-6 text-white">
           <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold">My Profile</h1>
-            {!editing ? (
+            <h1 className="text-2xl font-bold">
+              {isSetupMode ? 'Complete Your Profile' : 'Patient Profile'}
+            </h1>
+            {!editing && !isSetupMode && (
               <button 
                 onClick={() => setEditing(true)}
                 className="px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-blue-50 transition-colors flex items-center gap-2"
@@ -141,29 +189,6 @@ const PatientProfile = () => {
                 <Edit className="h-4 w-4" />
                 <span>Edit Profile</span>
               </button>
-            ) : (
-              <div className="flex gap-2">
-                <button 
-                  onClick={handleCancel}
-                  className="px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-colors flex items-center gap-2"
-                  disabled={saveLoading}
-                >
-                  <X className="h-4 w-4" />
-                  <span>Cancel</span>
-                </button>
-                <button 
-                  onClick={handleSave}
-                  className="px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-blue-50 transition-colors flex items-center gap-2"
-                  disabled={saveLoading}
-                >
-                  {saveLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4" />
-                  )}
-                  <span>Save Changes</span>
-                </button>
-              </div>
             )}
           </div>
         </div>
@@ -369,6 +394,35 @@ const PatientProfile = () => {
                         ))
                       ) : (
                         <p className="text-gray-500 italic">No known allergies</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+                
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">Chronic Diseases</p>
+                  {editing ? (
+                    <textarea
+                      name="chronicDiseases"
+                      value={formData.chronicDiseases}
+                      onChange={handleChange}
+                      className="w-full border rounded-md p-2"
+                      placeholder="Enter chronic diseases separated by commas"
+                      rows="3"
+                    />
+                  ) : (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {profile.chronicDiseases && profile.chronicDiseases.length > 0 ? (
+                        profile.chronicDiseases.map((disease, index) => (
+                          <span 
+                            key={index}
+                            className="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-sm"
+                          >
+                            {disease}
+                          </span>
+                        ))
+                      ) : (
+                        <p className="text-gray-500 italic">No chronic diseases listed</p>
                       )}
                     </div>
                   )}

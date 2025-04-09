@@ -1,38 +1,79 @@
-import React from 'react';
-import { Navigate } from 'react-router-dom';
-import { authService } from '../../services';
+import React, { useState, useEffect } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
+import { ROUTES } from '../../config/constants';
+import authService from '../../services/authService';
+import api from '../../utils/api'; // Ensure this path is correct
+// import api from '../../services/api';
 
 /**
  * A component that protects routes by checking if the user is authenticated
  * and has the appropriate role before rendering the children
- * 
- * @param {Object} props - Component props
- * @param {React.ReactNode} props.children - The components to render if authenticated
- * @param {string|string[]} props.allowedRoles - The roles allowed to access the route
- * @returns {React.ReactNode} The protected route
  */
-const ProtectedRoute = ({ children, allowedRoles }) => {
-  // Check if user is authenticated
-  const isAuthenticated = authService.isAuthenticated();
-  
-  // Get user role
-  const userRole = authService.getUserRole();
-  
-  // If not authenticated, redirect to login
+const ProtectedRoute = ({ children, allowedRoles = [] }) => {
+  const location = useLocation();
+  const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userRole, setUserRole] = useState(null);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        setLoading(true);
+        const isLoggedIn = authService.isAuthenticated();
+
+        if (!isLoggedIn) {
+          setIsAuthenticated(false);
+          return;
+        }
+
+        const userData = authService.getUserData();
+        setUserRole(userData ? userData.role : null);
+
+        await authService.verifyToken(); // Check if token is valid
+        setIsAuthenticated(true);
+      } catch (error) {
+        console.error('Token verification failed:', error);
+        await authService.logout();
+        setIsAuthenticated(false);
+        toast.error('Your session has expired. Please login again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, []); // Empty dependency array ensures this runs once on mount
+
+  const logout = async () => {
+    try {
+      const response = await api.post('/api/auth/logout', {}, { withCredentials: true });
+      console.log('Logout response:', response.data);
+    } catch (error) {
+      if (error.response) {
+        console.error('Logout error response:', error.response.data);
+      } else {
+        console.error('Logout error:', error.message);
+      }
+    }
+  };
+
+  if (loading) {
+    return <div>Loading...</div>; // Show a loading indicator
+  }
+
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    sessionStorage.setItem('redirectAfterLogin', location.pathname);
+    toast.error('Please log in to access this page');
+    return <Navigate to={ROUTES.LOGIN} replace state={{ from: location }} />;
   }
-  
-  // Convert allowedRoles to array if it's a string
-  const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
-  
-  // If roles are specified and user's role is not included, redirect to home
-  if (roles.length > 0 && !roles.includes(userRole)) {
-    return <Navigate to="/" replace />;
+
+  if (allowedRoles.length > 0 && !allowedRoles.includes(userRole)) {
+    toast.error('You do not have permission to access this page');
+    return <Navigate to={ROUTES.HOME} replace />;
   }
-  
-  // If user is authenticated and has the appropriate role, render the children
+
   return children;
 };
 
-export default ProtectedRoute; 
+export default ProtectedRoute;

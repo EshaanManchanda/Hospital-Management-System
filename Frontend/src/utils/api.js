@@ -1,53 +1,89 @@
 import axios from 'axios';
+import { toast } from 'react-hot-toast';
 import authService from '../services/authService';
 import patientService from '../services/patientService';
 import doctorService from '../services/doctorService';
 import appointmentService from '../services/appointmentService';
 
-// If you want to use environment variables later, make sure your build tool supports it
-const API_URL = 'https://hospital-management-system-0qrz.onrender.com/api';
-const API_TIMEOUT = 30000;
+// Get the API URL from environment variables or use the fallback
+const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// No need to append /api as it's included in the routes
+const apiTimeout = parseInt(import.meta.env.VITE_API_TIMEOUT || '45000');
 
-// Create an axios instance with default config
+console.log('API configured with:', { 
+  baseUrl: apiBaseUrl,
+  timeout: apiTimeout 
+});
+
+// Create axios instance
 const api = axios.create({
-  baseURL: API_URL,
-  timeout: API_TIMEOUT,
+  baseURL: apiBaseUrl,  // Use apiBaseUrl directly without appending /api
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true, // Enable sending cookies in cross-origin requests
 });
 
-// Add request interceptor to include the authentication token in the headers
+// Request interceptor for adding auth token
 api.interceptors.request.use(
   (config) => {
+    // Get token from localStorage
     const token = localStorage.getItem('token');
+    
+    // If token exists, add to headers
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-// Add response interceptor to handle common error cases
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    // Handle 401 unauthorized errors (expired token, etc.)
-    if (error.response && error.response.status === 401) {
-      // Clear local storage
-      localStorage.removeItem('token');
-      localStorage.removeItem('userRole');
-      localStorage.removeItem('userData');
-      
-      // Redirect to login page
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
-      }
+      config.headers['Authorization'] = `Bearer ${token}`;
     }
     
-    // Log the error for debugging
-    console.error('API Error:', error.response?.data || error.message);
+    return config;
+  },
+  (error) => {
+    console.error('API Request Error:', error);
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor for handling errors
+api.interceptors.response.use(
+  (response) => {
+    return response;
+  },
+  (error) => {
+    console.error('API Response Error:', error);
+    
+    // Handle specific error cases
+    if (error.response) {
+      // The request was made and the server responded with a status code
+      // that falls out of the range of 2xx
+      console.error('Response data:', error.response.data);
+      console.error('Response status:', error.response.status);
+      
+      // Handle authentication errors
+      if (error.response.status === 401 || error.response.status === 403) {
+        // Check if it's a token expiration error
+        if (error.response.data.message && 
+            (error.response.data.message.includes('expired') || 
+             error.response.data.message.includes('invalid'))) {
+          toast.error('Your session has expired. Please login again.');
+          // Clear auth data
+          localStorage.removeItem('token');
+          localStorage.removeItem('userData');
+          
+          // Redirect to login after a short delay
+          setTimeout(() => {
+            window.location.href = '/login';
+          }, 1500);
+        }
+      }
+    } else if (error.request) {
+      // The request was made but no response was received
+      console.error('Request made but no response received:', error.request);
+      toast.error('No response from server. Please check your connection.');
+    } else {
+      // Something happened in setting up the request that triggered an Error
+      console.error('Error setting up request:', error.message);
+    }
     
     return Promise.reject(error);
   }

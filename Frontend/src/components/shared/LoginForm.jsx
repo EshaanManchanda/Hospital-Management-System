@@ -1,13 +1,16 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { FaEnvelope, FaLock, FaSignInAlt, FaExclamationTriangle } from "react-icons/fa";
+import { FaEnvelope, FaLock, FaSignInAlt, FaExclamationTriangle, FaGoogle } from "react-icons/fa";
 import { authService } from "../../services";
 import { testApiConnection as apiConnectionTest, testAuthentication } from "../../debug-api";
-import { LoginContext } from "../../contexts/LoginContext";
+import { useLogin } from "../../contexts/LoginContext";
+import { useGoogleAuth } from "../../contexts/GoogleAuthContext";
+import { toast } from "react-hot-toast";
 
 const LoginForm = () => {
-  const { login } = useContext(LoginContext);
+  const { login } = useLogin();
+  const { initiateGoogleLogin, loading: googleLoading } = useGoogleAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [formData, setFormData] = useState({
@@ -138,8 +141,12 @@ const LoginForm = () => {
     setDebugInfo(null);
 
     try {
-      // Call the login function from context with remember me option
-      const loginResponse = await login(formData.email, formData.password, rememberMe);
+      // Call the login function with form data
+      const response = await authService.login(formData.email, formData.password);
+      
+      if (!response.success) {
+        throw new Error(response.message || "Login failed. Please check your credentials.");
+      }
       
       // Reset form after successful login
       setFormData({
@@ -149,31 +156,48 @@ const LoginForm = () => {
       
       setLoginSuccess(true);
       
-      // Get the user role from the response or localStorage
-      const userRole = loginResponse.role || authService.getUserRole();
+      // Get the user role from the response data
+      const userData = response.data.user;
+      const userRole = userData.role;
+      
       console.log("User role for navigation:", userRole);
+      
+      // Check for redirect path in session storage
+      const redirectPath = sessionStorage.getItem('redirectAfterLogin');
+      if (redirectPath) {
+        sessionStorage.removeItem('redirectAfterLogin');
+        navigate(redirectPath, { replace: true });
+        return;
+      }
+      
       // Redirect based on user role
-      setTimeout(() => {
-        if (userRole === 'admin') {
+      switch (userRole) {
+        case 'admin':
           navigate("/admin-dashboard", { replace: true });
-        } else if (userRole === 'doctor') {
+          break;
+        case 'doctor':
           navigate("/doctor-dashboard", { replace: true });
-        } else if (userRole === 'patient') {
+          break;
+        case 'patient':
           navigate("/patient-dashboard", { replace: true });
-        } else if (userRole === 'nurse') {
+          break;
+        case 'nurse':
           navigate("/nurse-dashboard", { replace: true });
-        } else if (userRole === 'pharmacist') {
+          break;
+        case 'pharmacist':
           navigate("/pharmacy-dashboard", { replace: true });
-        } else {
+          break;
+        default:
           // Default to home page if role is unknown
           navigate("/", { replace: true });
-        }
-      }, 500);
+      }
     } catch (err) {
       setError(err.message || "Failed to login. Please check your credentials.");
       
       // If normal login fails, try the test authentication
-      testAuth();
+      if (process.env.NODE_ENV === 'development') {
+        testAuth();
+      }
     } finally {
       setIsLoading(false);
     }
@@ -204,6 +228,54 @@ const LoginForm = () => {
     // Force direct navigation to admin dashboard with full page reload
     console.log("Redirecting to admin dashboard...");
     window.location.href = '/admin-dashboard';
+  };
+
+  const handleGoogleLogin = async () => {
+    try {
+      console.log("Initiating Google login from LoginForm");
+      setIsLoading(true);
+      setError("");
+      
+      // Call the initiateGoogleLogin function from GoogleAuthContext
+      await initiateGoogleLogin();
+      
+      // The redirect will happen automatically
+      console.log("Google OAuth flow initiated, redirecting to Google");
+    } catch (error) {
+      console.error("Google login error:", error);
+      setError(error.message || "Failed to login with Google. Please try again.");
+      toast.error(error.message || "Google login failed");
+      setIsLoading(false);
+    }
+    // We don't set loading to false on success because the page will redirect
+  };
+
+  const handleRegister = async (formData) => {
+    if (!formData.password) {
+      // Show validation error to user
+      toast.error("Password is required");
+      return;
+    }
+
+    try {
+      const result = await authService.register({
+        name: formData.name,
+        email: formData.email,
+        password: formData.password, // Make sure this is always included
+        role: formData.role,
+        // other data...
+      });
+      
+      if (result.success) {
+        toast.success("Registration successful!");
+        // Redirect or other success handling
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      console.error("Registration error:", error);
+      toast.error("Failed to register. Please try again.");
+    }
   };
 
   return (

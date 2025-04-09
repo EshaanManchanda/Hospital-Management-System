@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
+import crypto from 'crypto';
 
 const userSchema = new mongoose.Schema({
   userId: {
@@ -13,30 +14,40 @@ const userSchema = new mongoose.Schema({
   },
   name: {
     type: String,
-    required: [true, 'Name is required'],
+    required: [true, 'Please add a name'],
     trim: true
   },
   email: {
     type: String,
-    required: [true, 'Email is required'],
+    required: [true, 'Please add an email'],
     unique: true,
-    lowercase: true,
-    trim: true,
-    match: [/^\S+@\S+\.\S+$/, 'Please use a valid email address']
+    match: [
+      /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
+      'Please add a valid email'
+    ]
   },
   password: {
     type: String,
-    required: [true, 'Password is required'],
-    minlength: [6, 'Password should be at least 6 characters long']
+    required: function() {
+      return !this.googleId; // Password is required only if not using Google OAuth
+    },
+    minlength: 6,
+    select: false
+  },
+  googleId: {
+    type: String,
+    select: false
   },
   role: {
     type: String,
-    enum: ['admin', 'doctor', 'patient', 'nurse', 'pharmacist', 'receptionist'],
+    enum: ['patient', 'doctor', 'admin', 'nurse', 'receptionist'],
     default: 'patient'
   },
   mobile: {
     type: String,
-    required: [true, 'Mobile number is required'],
+    required: function() {
+      return !this.googleId; // Mobile is required only if not using Google OAuth
+    },
     match: [/^[0-9]{10}$/, 'Please enter a valid 10-digit mobile number']
   },
   address: {
@@ -59,11 +70,17 @@ const userSchema = new mongoose.Schema({
   gender: {
     type: String,
     enum: ['male', 'female', 'other'],
-    required: true
+    required: function() {
+      return !this.googleId; // Gender is required only if not using Google OAuth
+    }
   },
   isActive: {
     type: Boolean,
     default: true
+  },
+  isVerified: {
+    type: Boolean,
+    default: false
   },
   createdAt: {
     type: Date,
@@ -74,22 +91,62 @@ const userSchema = new mongoose.Schema({
     default: Date.now
   },
   resetPasswordToken: String,
-  resetPasswordExpire: Date
+  resetPasswordExpire: Date,
+  picture: {
+    type: String
+  },
+  avatar: {
+    type: String
+  }
 }, { timestamps: true });
 
-// Hash password before saving
+// Encrypt password using bcrypt
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) {
     next();
   }
+
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
-  next();
 });
 
-// Method to compare passwords
-userSchema.methods.comparePassword = async function(enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
+// Match user entered password to hashed password in database
+userSchema.methods.matchPassword = async function(enteredPassword) {
+  console.log('Attempting to match password');
+  try {
+    if (!enteredPassword) {
+      console.error('Empty password provided for comparison');
+      return false;
+    }
+    if (!this.password) {
+      console.error('User does not have a password hash stored');
+      return false;
+    }
+    
+    const isMatch = await bcrypt.compare(enteredPassword, this.password);
+    console.log(`Password comparison result: ${isMatch}`);
+    return isMatch;
+  } catch (error) {
+    console.error('Error in password matching:', error);
+    return false;
+  }
+};
+
+// Generate and hash password token
+userSchema.methods.getResetPasswordToken = function() {
+  // Generate token
+  const resetToken = crypto.randomBytes(20).toString('hex');
+
+  // Hash token and set to resetPasswordToken field
+  this.resetPasswordToken = crypto
+    .createHash('sha256')
+    .update(resetToken)
+    .digest('hex');
+
+  // Set expire
+  this.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
+
+  return resetToken;
 };
 
 export const User = mongoose.model('User', userSchema); 

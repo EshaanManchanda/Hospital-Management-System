@@ -1,34 +1,41 @@
-import React, { useState, useContext } from "react";
+import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { FcGoogle } from 'react-icons/fc';
+import { useLogin } from "../../contexts/LoginContext";
+import { useGoogleAuth, GoogleAuthProvider } from "../../contexts/GoogleAuthContext";
+import { toast } from "react-hot-toast";
 
-import { FaEnvelope, FaLock, FaSignInAlt } from "react-icons/fa";
-import LoginContext from "@/contexts/LoginContext";
-
-const Login = () => {
-  const { login } = useContext(LoginContext);
+const LoginContent = () => {
+  const { login } = useLogin();
+  const { initiateGoogleLogin } = useGoogleAuth();
   const navigate = useNavigate();
-
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-  });
   
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
     
     try {
-      // Use the login function from context instead of directly setting isLoggedIn
-      await login(formData.email, formData.password);
+      // Validate inputs
+      if (!formData.email || !formData.password) {
+        throw new Error("Email and password are required");
+      }
+      
+      console.log("Attempting login with email:", formData.email);
+      
+      // Use the login function with object format
+      const response = await login({
+        email: formData.email,
+        password: formData.password
+      });
+      
+      console.log("Login response:", response);
+      
+      if (!response || !response.success) {
+        console.error("Login failed with response:", response);
+        throw new Error(response?.message || "Login failed");
+      }
       
       // Reset form after successful login
       setFormData({
@@ -36,98 +43,170 @@ const Login = () => {
         password: "",
       });
       
-      // Navigate to dashboard or home
-      navigate("/");
+      toast.success("Login successful!");
+      
+      // Check if there's a specific redirect path
+      const redirectPath = sessionStorage.getItem('redirectAfterLogin');
+      console.log("Redirect path:", redirectPath);
+      
+      if (redirectPath) {
+        sessionStorage.removeItem('redirectAfterLogin');
+        navigate(redirectPath, { replace: true });
+      } else {
+        // Get user role from response
+        const userRole = response.data?.user?.role || 'patient';
+        console.log("User role from response:", userRole);
+        
+        // Navigate based on user role
+        switch (userRole) {
+          case 'admin':
+            navigate("/admin-dashboard", { replace: true });
+            break;
+          case 'doctor':
+            navigate("/doctor-dashboard", { replace: true });
+            break;
+          case 'patient':
+            navigate("/patient-dashboard", { replace: true });
+            break;
+          case 'nurse':
+            navigate("/nurse-dashboard", { replace: true });
+            break;
+          case 'receptionist':
+            navigate("/receptionist-dashboard", { replace: true });
+            break;
+          default:
+            console.warn("Unknown role in response:", userRole);
+            navigate("/", { replace: true });
+        }
+      }
     } catch (err) {
       console.error("Login error:", err);
-      setError(err.message || "Failed to login. Please check your credentials.");
+      
+      // Extract the most useful error message
+      let errorMessage = "Failed to login. Please check your credentials.";
+      
+      if (err.response) {
+        // Server responded with an error
+        console.error("Server error response:", err.response.data);
+        errorMessage = err.response.data?.message || errorMessage;
+      } else if (err.message) {
+        // Error has a message property
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleGoogleLogin = () => {
+    // Default role is 'patient', the backend will determine actual role based on email
+    initiateGoogleLogin('patient');
+  };
+
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  });
+  
+  const [isLoading, setIsLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
   return (
-    <div className="bg-[hsl(var(--background))] min-h-screen flex items-center justify-center p-4">
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="bg-[hsl(var(--card))] p-8 rounded-lg shadow-lg max-w-md w-full"
-      >
-        <h2 className="text-3xl font-bold text-[hsl(var(--primary))] mb-6 text-center">
-          Login to Health Nest
-        </h2>
-        {error && (
-          <div className="bg-red-50 text-red-500 p-3 rounded-md mb-4 text-sm">
-            {error}
-          </div>
-        )}
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
+      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
+        <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">Login to Your Account</h2>
+        
+        {/* Social login buttons */}
+        <div className="mb-4">
+          <button
+            onClick={handleGoogleLogin}
+            className="flex items-center justify-center w-full bg-white border border-gray-300 p-2 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-sm"
+          >
+            <FcGoogle className="text-xl mr-2" />
+            Continue with Google
+          </button>
+        </div>
+
+        {/* Divider */}
+        <div className="relative flex items-center justify-center my-6">
+          <div className="border-t border-gray-300 absolute w-full"></div>
+          <div className="bg-white px-3 relative text-sm text-gray-500">OR</div>
+        </div>
+
+        {/* Login form (placeholder) */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label
-              htmlFor="email"
-              className="block text-sm font-medium text-[hsl(var(--foreground))] mb-1"
-            >
-              Email
-            </label>
-            <div className="relative">
-              <FaEnvelope className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[hsl(var(--muted-foreground))]" />
-              <input
-                type="email"
-                id="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                className="pl-10 pr-4 py-2 w-full border border-[hsl(var(--border))] rounded-md focus:outline-none focus:ring-2 focus:ring-[hsl(var(--accent))]"
-                placeholder="youremail@example.com"
-                required
-                disabled={isLoading}
-              />
-            </div>
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <input 
+              type="email" 
+              id="email" 
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="name@example.com"
+            />
           </div>
           <div>
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-[hsl(var(--foreground))] mb-1"
-            >
-              Password
-            </label>
-            <div className="relative">
-              <FaLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[hsl(var(--muted-foreground))]" />
-              <input
-                type="password"
-                id="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                className="pl-10 pr-4 py-2 w-full border border-[hsl(var(--border))] rounded-md focus:outline-none focus:ring-2 focus:ring-[hsl(var(--accent))]"
-                placeholder="••••••••"
-                required
-                disabled={isLoading}
-              />
-            </div>
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <input 
+              type="password" 
+              id="password" 
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="•••••••"
+            />
           </div>
-          <button
-            type="submit"
-            className="w-full bg-[hsl(var(--accent))] text-white font-bold py-2 px-4 rounded-md hover:bg-[hsl(var(--accent))/80] transition duration-300 flex items-center justify-center shadow-md"
-            disabled={isLoading}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <input 
+                id="remember-me" 
+                type="checkbox" 
+                className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" 
+              />
+              <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
+                Remember me
+              </label>
+            </div>
+            <a href="#" className="text-sm text-blue-600 hover:text-blue-500">
+              Forgot password?
+            </a>
+          </div>
+          <button 
+            type="submit" 
+            className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
           >
-            {isLoading ? (
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-            ) : (
-              <FaSignInAlt className="mr-2" />
-            )}
-            {isLoading ? "Logging in..." : "Login"}
+            Sign in
           </button>
         </form>
-        <p className="mt-4 text-center text-sm text-[hsl(var(--muted-foreground))]">
-          Don't have an account?{" "}
-          <Link to="/signup" className="text-[hsl(var(--accent))] hover:underline">
+
+        {/* Sign up link */}
+        <p className="mt-6 text-center text-sm text-gray-600">
+          Don't have an account?{' '}
+          <Link to="/signup" className="text-blue-600 hover:text-blue-500 font-medium">
             Sign up
           </Link>
         </p>
-      </motion.div>
+      </div>
     </div>
+  );
+};
+
+const Login = () => {
+  return (
+    <GoogleAuthProvider>
+      <LoginContent />
+    </GoogleAuthProvider>
   );
 };
 

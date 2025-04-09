@@ -12,7 +12,7 @@ const doctorService = {
    */
   getAllDoctors: async (page = 1, limit = 10) => {
     try {
-      const response = await api.get(`/doctors?page=${page}&limit=${limit}`);
+      const response = await api.get(`/api/doctors?page=${page}&limit=${limit}`);
       return response.data;
     } catch (error) {
       console.error('Get doctors error:', error);
@@ -27,7 +27,7 @@ const doctorService = {
    */
   getDoctorById: async (id) => {
     try {
-      const response = await api.get(`/doctors/${id}`);
+      const response = await api.get(`/api/doctors/${id}`);
       return response.data;
     } catch (error) {
       console.error('Get doctor error:', error);
@@ -42,7 +42,7 @@ const doctorService = {
    */
   createDoctor: async (doctorData) => {
     try {
-      const response = await api.post('/doctors', doctorData);
+      const response = await api.post('/api/doctors', doctorData);
       return response.data;
     } catch (error) {
       console.error('Create doctor error:', error);
@@ -58,7 +58,7 @@ const doctorService = {
    */
   updateDoctor: async (id, doctorData) => {
     try {
-      const response = await api.put(`/doctors/${id}`, doctorData);
+      const response = await api.put(`/api/doctors/${id}`, doctorData);
       return response.data;
     } catch (error) {
       console.error('Update doctor error:', error);
@@ -73,7 +73,7 @@ const doctorService = {
    */
   deleteDoctor: async (id) => {
     try {
-      const response = await api.delete(`/doctors/${id}`);
+      const response = await api.delete(`/api/doctors/${id}`);
       return response.data;
     } catch (error) {
       console.error('Delete doctor error:', error);
@@ -89,7 +89,7 @@ const doctorService = {
    */
   addDoctorRating: async (id, ratingData) => {
     try {
-      const response = await api.post(`/doctors/${id}/ratings`, ratingData);
+      const response = await api.post(`/api/doctors/${id}/ratings`, ratingData);
       return response.data;
     } catch (error) {
       console.error('Add doctor rating error:', error);

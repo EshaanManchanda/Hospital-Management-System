@@ -1,4 +1,13 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from "react-router-dom";
+import React, { useState, useEffect } from 'react';
+import { 
+  BrowserRouter as Router,
+  Routes, 
+  Route, 
+  Navigate, 
+  Outlet, 
+  useLocation,
+  useNavigate
+} from "react-router-dom";
 import { Suspense, lazy } from "react";
 import { Toaster } from "@/components/admin/ui/toaster";
 import { Toaster as Sonner } from "@/components/admin/ui/sonner";
@@ -6,35 +15,47 @@ import { TooltipProvider } from "@/components/admin/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { LoginProvider } from "./contexts/LoginContext";
-import { useLocation } from "react-router-dom";
+import { AuthProvider } from "./contexts/AuthContext";
+import { GoogleAuthProvider } from "./contexts/GoogleAuthContext";
+import { ErrorBoundary } from 'react-error-boundary';
+import { Toaster as ReactHotToastToaster } from 'react-hot-toast';
+import { Provider } from 'react-redux';
+import store from './store';
+import { toast } from 'react-hot-toast';
+import ProtectedRoute from "./components/shared/ProtectedRoute";
+import AuthDebugger from './components/shared/AuthDebugger';
+import DashboardRedirect from './components/DashboardRedirect';
+import { useDispatch } from 'react-redux';
 
 // Import basic components
 import Header from "./components/client/Header";
 import Footer from "./components/client/Footer";
-import ScrollToTop from "./components/client/ScrollToTop";
 import ScrollToTopButton from "./components/client/ScrollToTopButton";
 import NotFound from "./components/client/NotFound";
-import { authService } from "./services";
+import GoogleOAuthCallback from "./components/GoogleOAuthCallback";
 
-// Import admin components
-import AdminLayout from "./components/admin/layout/Layout";
-import Dashboard from "./pages/admin/Dashboard";
-import Patients from "./pages/admin/Patients";
-import AdminDoctors from "./pages/admin/Doctors";
-import Appointments from "./pages/admin/Appointments";
-import Records from "./pages/admin/Records";
-import Pharmacy from "./pages/admin/Pharmacy";
-import Revenue from "./pages/admin/Revenue";
-import BookBed from "./pages/admin/BookBed";
-import Messages from "./pages/admin/Messages";
-import Schedule from "./pages/admin/Schedule";
-import Notifications from "./pages/admin/Notifications";
-import Reports from "./pages/admin/Reports";
-import Settings from "./pages/admin/Settings";
+// Import dashboard components
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import DoctorDashboard from "./pages/doctor/DoctorDashboard";
+import PatientDashboard from "./pages/patient/PatientDashboard";
 
-// Create a new QueryClient instance for React Query
-const queryClient = new QueryClient();
+// Import doctor components
+import DoctorLayout from "./layouts/DoctorLayout";
+import DoctorAppointments from "./pages/doctor/DoctorAppointments";
+import DoctorPatients from "./pages/doctor/DoctorPatients";
+import DoctorPrescriptions from "./pages/doctor/DoctorPrescriptions";
+import DoctorReports from "./pages/doctor/DoctorReports";
+import DoctorProfile from "./pages/doctor/DoctorProfile";
+
+// Import patient components
+import PatientLayout from "./layouts/PatientLayout";
+import Appointments from "./pages/patient/Appointments";
+import MedicalReports from "./pages/patient/MedicalReports";
+import NewAppointment from "./pages/patient/NewAppointment";
+import PatientBeds from "./pages/patient/PatientBeds";
+import PatientMedications from "./pages/patient/PatientMedications";
+import PatientPrescriptions from "./pages/patient/PatientPrescriptions";
+import PatientProfile from "./pages/patient/PatientProfile";
 
 // Lazy load components
 const Home = lazy(() => import("./components/client/Home"));
@@ -48,97 +69,8 @@ const ContactUs = lazy(() => import("./pages/client/ContactUs"));
 const TermsOfService = lazy(() => import("./pages/client/TermsOfService"));
 const PrivacyPolicy = lazy(() => import("./pages/client/PrivacyPolicy"));
 
-// Patient Pages
-const PatientDashboardLegacy = lazy(() => import("./pages/patient/PatientDashboard"));
-const PatientProfile = lazy(() => import("./pages/patient/PatientProfile"));
-const MedicalReports = lazy(() => import("./pages/patient/MedicalReports"));
-const NewAppointment = lazy(() => import("./pages/patient/NewAppointment"));
-const PatientMedications = lazy(() => import("./pages/patient/PatientMedications"));
-const PatientPrescriptions = lazy(() => import("./pages/patient/PatientPrescriptions"));
-const PatientBeds = lazy(() => import("./pages/patient/PatientBeds"));
-
-// Import patient dashboard components
-import PatientLayout from "./layouts/PatientLayout";
-import PatientDashboard from "./pages/patient/Dashboard";
-import PatientAppointments from "./pages/patient/Appointments";
-
-// Lazy load client pages
-const ClientDoctors = lazy(() => import("./pages/client/Doctors"));
-const ClientPatients = lazy(() => import("./pages/client/Patients"));
-const ClientAppointments = lazy(() => import("./pages/client/Appointments"));
-
-// Protect routes that require authentication
-const ProtectedRoute = ({ children, allowedRoles = [] }) => {
-  const isAuthenticated = authService.isAuthenticated();
-  const userRole = authService.getUserRole();
-  
-  console.log("ProtectedRoute - Auth check:", { 
-    isAuthenticated, 
-    userRole, 
-    allowedRoles,
-    currentPath: window.location.pathname 
-  });
-
-  // If not authenticated, redirect to login
-  if (!isAuthenticated) {
-    console.log("ProtectedRoute - Not authenticated, redirecting to login");
-    return <Navigate to="/login" replace />;
-  }
-  
-  // If roles are specified and user's role is not included, redirect based on their role
-  if (allowedRoles.length > 0 && !allowedRoles.includes(userRole)) {
-    console.log(`ProtectedRoute - Role ${userRole} not allowed. Allowed roles:`, allowedRoles);
-    
-    // Redirect to appropriate dashboard based on their role
-    if (userRole === 'admin') {
-      console.log("ProtectedRoute - Admin role detected, redirecting to admin dashboard");
-      // Use direct browser navigation for admin to ensure complete page reload
-      window.location.href = '/admin-dashboard';
-      return null;
-    } else if (userRole === 'doctor') {
-      console.log("ProtectedRoute - Doctor role detected, redirecting to doctor dashboard");
-      return <Navigate to="/doctor-dashboard" replace />;
-    } else if (userRole === 'patient') {
-      console.log("ProtectedRoute - Patient role detected, redirecting to patient dashboard");
-      return <Navigate to="/patient-dashboard" replace />;
-    }
-    
-    console.log("ProtectedRoute - Unknown role, redirecting to home");
-    return <Navigate to="/" replace />;
-  }
-  
-  console.log("ProtectedRoute - Access granted");
-  return children;
-};
-
-// Dashboard redirect handler
-const DashboardRedirect = () => {
-  const isAuthenticated = authService.isAuthenticated();
-  const userRole = authService.getUserRole();
-  
-  console.log("DashboardRedirect - Auth check:", { isAuthenticated, userRole });
-  
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-  
-  // Redirect to appropriate dashboard based on role
-  if (userRole === "admin") {
-    // For admin users, use direct navigation to ensure proper loading
-    console.log("DashboardRedirect - Redirecting admin to admin dashboard");
-    window.location.href = '/admin-dashboard';
-    return null;
-  } else if (userRole === "doctor") {
-    console.log("DashboardRedirect - Redirecting doctor to doctor dashboard");
-    return <Navigate to="/doctor-dashboard" replace />;
-  } else if (userRole === "patient") {
-    console.log("DashboardRedirect - Redirecting patient to patient dashboard");
-    return <Navigate to="/patient-dashboard" replace />;
-  } else {
-    console.log("DashboardRedirect - Unknown role, redirecting to home");
-    return <Navigate to="/" replace />;
-  }
-};
+// Create React Query client
+const queryClient = new QueryClient();
 
 // Loading fallback component
 const LoadingFallback = () => (
@@ -147,135 +79,212 @@ const LoadingFallback = () => (
   </div>
 );
 
-function App() {
+// Error fallback component
+const ErrorFallback = ({ error, resetErrorBoundary }) => {
+  console.error('ErrorBoundary caught an error:', error);
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <TooltipProvider>
-          <LoginProvider>
-            <Toaster />
-            <Sonner />
-            <Router>
-              <ScrollToTop />
-              <AppContent />
-            </Router>
-          </LoginProvider>
-        </TooltipProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+    <div className="flex flex-col items-center justify-center min-h-screen p-4">
+      <h2 className="text-2xl font-bold text-red-600 mb-4">Something went wrong</h2>
+      <pre className="text-sm bg-red-50 p-4 rounded-lg mb-4 max-w-lg overflow-auto">
+        {error.message}
+      </pre>
+      <div className="space-x-4">
+        <button
+          onClick={resetErrorBoundary}
+          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+        >
+          Try again
+        </button>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+        >
+          Reload page
+        </button>
+      </div>
+    </div>
   );
-}
+};
 
-// AppContent component with access to router hooks
+// AuthContent component that needs Router
+const AuthContent = () => {
+  const dispatch = useDispatch();
+  return (
+    <AuthProvider>
+      <GoogleAuthProvider>
+        <LoginProvider>
+          <AppContent />
+        </LoginProvider>
+      </GoogleAuthProvider>
+    </AuthProvider>
+  );
+};
+
+// AppContent component
 const AppContent = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const isPatientDashboard = location.pathname.startsWith('/patient-dashboard');
+  const [initialAuthChecked, setInitialAuthChecked] = useState(false);
+  const [user, setUser] = useState(null);
+  
+  // Check initial auth state and redirect based on path
+  useEffect(() => {
+    const pathRequiresAuth = 
+      location.pathname.startsWith('/admin-dashboard') || 
+      location.pathname.startsWith('/doctor-dashboard') || 
+      location.pathname.startsWith('/patient-dashboard');
+    
+    if (pathRequiresAuth) {
+      const token = localStorage.getItem('token');
+      const userDataStr = localStorage.getItem('userData');
+      
+      if (!token || !userDataStr) {
+        navigate('/login', { replace: true });
+        return;
+      }
+      
+      try {
+        const userData = JSON.parse(userDataStr);
+        const userRole = userData?.role;
+        
+        // Check if user has correct role for the path
+        if (location.pathname.startsWith('/admin-dashboard') && userRole !== 'admin') {
+          toast.error('You do not have permission to access this page');
+          navigate('/', { replace: true });
+          return;
+        }
+        
+        if (location.pathname.startsWith('/doctor-dashboard') && userRole !== 'doctor') {
+          toast.error('You do not have permission to access this page');
+          navigate('/', { replace: true });
+          return;
+        }
+        
+        if (location.pathname.startsWith('/patient-dashboard') && userRole !== 'patient') {
+          toast.error('You do not have permission to access this page');
+          navigate('/', { replace: true });
+          return;
+        }
+      } catch (err) {
+        console.error('Error parsing user data:', err);
+        navigate('/login', { replace: true });
+      }
+    }
+    
+    setInitialAuthChecked(true);
+  }, [location.pathname, navigate]);
+  
+  if (!initialAuthChecked) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gray-900"></div>
+      </div>
+    );
+  }
 
   return (
     <>
       <Header />
       <ScrollToTopButton />
-      <main className="min-h-screen bg-gray-50">
-        <Suspense fallback={<LoadingFallback />}>
+      <main className={`min-h-screen ${isPatientDashboard ? 'bg-gray-100' : 'bg-gray-50'}`}>
+        <Suspense 
+          fallback={
+            <div className="flex items-center justify-center min-h-[60vh]">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gray-900"></div>
+            </div>
+          }
+        >
           <Routes>
-            {/* Public Routes - accessible by all without authentication */}
-            <Route path="/" element={<Home />} />
-            <Route path="/doctors" element={<Doctors />} />
-            <Route path="/patients" element={<PatientsPage />} />
-            <Route path="/appointments" element={<AppointmentsPage />} />
-            <Route path="/appointment" element={<Navigate to="/patient-dashboard" replace state={{ activeTab: "appointments" }} />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<SignUp />} />
-            <Route path="/about-us" element={<AboutUs />} />
-            <Route path="/contact-us" element={<ContactUs />} />
-            <Route path="/terms-of-service" element={<TermsOfService />} />
-            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-            
-            {/* Client Page Routes - These map to components in pages/client */}
-            <Route path="/client/doctors" element={<ClientDoctors />} />
-            <Route path="/client/patients" element={<ClientPatients />} />
-            <Route path="/client/appointments" element={<ClientAppointments />} />
-            
-            {/* Dashboard redirect routes */}
-            <Route path="/dashboard" element={<DashboardRedirect />} />
-            <Route path="/admin" element={<Navigate to="/admin-dashboard" replace />} />
-            <Route path="/doctor" element={<Navigate to="/doctor-dashboard" replace />} />
-            
-            {/* New Appointment Route */}
-            <Route path="/appointments/new" element={
-              <ProtectedRoute allowedRoles={['patient']}>
-                <NewAppointment />
-              </ProtectedRoute>
-            } />
-            
-            {/* Patient Dashboard Routes - Uses the PatientLayout */}
-            <Route path="/patient-dashboard/*" element={
-              <ProtectedRoute allowedRoles={['patient']}>
-                <PatientLayout />
-              </ProtectedRoute>
-            }>
-              <Route index element={<PatientDashboard />} />
-              <Route path="appointments" element={<PatientAppointments />} />
-              <Route path="reports" element={<MedicalReports />} />
-              <Route path="prescriptions" element={<PatientPrescriptions />} />
-              <Route path="medications" element={<PatientMedications />} />
-              <Route path="beds" element={<PatientBeds />} />
-              <Route path="profile" element={<PatientProfile />} />
-              <Route path="*" element={<Navigate to="/patient-dashboard" replace />} />
+            <Route path="/" element={<Outlet />}>
+              <Route index element={<Home />} />
+              <Route path="login" element={<Login />} />
+              <Route path="signup" element={<SignUp />} />
+              <Route path="about" element={<AboutUs />} />
+              <Route path="contact" element={<ContactUs />} />
+              <Route path="services" element={<TermsOfService />} />
+              <Route path="privacy-policy" element={<PrivacyPolicy />} />
+              <Route path="doctors" element={<Doctors />} />
+              <Route path="patients" element={<PatientsPage />} />
+              <Route path="appointments" element={<AppointmentsPage />} />
+              
+
+              {/* Special route for handling Google OAuth callback */}
+              <Route path="auth/google/callback" element={<GoogleOAuthCallback />} />
+              
+              {/* Protected Routes */}
+              <Route path="admin-dashboard/*" element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="doctor-dashboard/*" element={
+                <ProtectedRoute allowedRoles={['doctor']}>
+                  <DoctorLayout>
+                    <Routes>
+                      <Route path="/" element={<DoctorDashboard />} />
+                      <Route path="appointments" element={<DoctorAppointments />} />
+                      <Route path="patients" element={<DoctorPatients />} />
+                      <Route path="prescriptions" element={<DoctorPrescriptions />} />
+                      <Route path="reports" element={<DoctorReports />} />
+                      <Route path="profile" element={<DoctorProfile />} />
+                    </Routes>
+                  </DoctorLayout>
+                </ProtectedRoute>
+              } />
+              
+              <Route path="patient-dashboard/*" element={
+                <ProtectedRoute allowedRoles={['patient']}>
+                  <PatientLayout>
+                    <Routes>
+                      <Route path="/" element={<PatientDashboard />} />
+                      <Route path="appointments" element={<Appointments />} />
+                      <Route path="medical-reports" element={<MedicalReports />} />
+                      <Route path="new-appointment" element={<NewAppointment />} />
+                      <Route path="beds" element={<PatientBeds />} />
+                      <Route path="medications" element={<PatientMedications />} />
+                      <Route path="prescriptions" element={<PatientPrescriptions />} />
+                      <Route path="profile" element={<PatientProfile />} />
+                    </Routes>
+                  </PatientLayout>
+                </ProtectedRoute>
+              } />
+              
+              <Route path="dashboard" element={<DashboardRedirect />} />
+              <Route path="*" element={<NotFound />} />
             </Route>
-            
-            {/* Legacy routes support */}
-            <Route path="/patient-dashboard" element={<Navigate to="/patient-dashboard" replace />} />
-            
-            {/* Admin Dashboard Routes */}
-            <Route path="/admin-dashboard/*" element={
-              <ProtectedRoute allowedRoles={['admin']}>
-                <AdminLayout>
-                  <Routes>
-                    <Route index element={<Dashboard />} />
-                    <Route path="patients" element={<Patients />} />
-                    <Route path="doctors" element={<AdminDoctors />} />
-                    <Route path="appointments" element={<Appointments />} />
-                    <Route path="medical-records" element={<Records />} />
-                    <Route path="pharmacy" element={<Pharmacy />} />
-                    <Route path="revenue" element={<Revenue />} />
-                    <Route path="book-bed" element={<BookBed />} />
-                    <Route path="messages" element={<Messages />} />
-                    <Route path="schedule" element={<Schedule />} />
-                    <Route path="notifications" element={<Notifications />} />
-                    <Route path="reports" element={<Reports />} />
-                    <Route path="settings" element={<Settings />} />
-                    <Route path="*" element={<Navigate to="/admin-dashboard" replace />} />
-                  </Routes>
-                </AdminLayout>
-              </ProtectedRoute>
-            } />
-            
-            {/* Doctor Dashboard Routes */}
-            <Route path="/doctor-dashboard/*" element={
-              <ProtectedRoute allowedRoles={['doctor']}>
-                <Routes>
-                  <Route path="/" element={<NotFound />} />
-                  <Route path="patients" element={<NotFound />} />
-                  <Route path="appointments" element={<NotFound />} />
-                  <Route path="prescriptions" element={<NotFound />} />
-                  <Route path="*" element={<Navigate to="/doctor-dashboard" replace />} />
-                </Routes>
-              </ProtectedRoute>
-            } />
-            
-            {/* Legacy route support for direct access */}
-            <Route path="/patient/profile" element={<Navigate to="/patient-dashboard/profile" replace />} />
-            <Route path="/patient/reports" element={<Navigate to="/patient-dashboard/reports" replace />} />
-            
-            {/* 404 Route */}
-            <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
       </main>
       {!isPatientDashboard && <Footer />}
+      <ReactHotToastToaster position="top-right" />
+      <Toaster />
+      <Sonner />
+      <AuthDebugger />
     </>
   );
 };
 
-export default App; 
+// Main App component
+const App = () => {
+  return (
+    <ErrorBoundary FallbackComponent={ErrorFallback}>
+      <Provider store={store}>
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider>
+            <TooltipProvider>
+              <Router>
+                <Suspense fallback={<LoadingFallback />}>
+                  <AuthContent />
+                </Suspense>
+              </Router>
+            </TooltipProvider>
+          </ThemeProvider>
+        </QueryClientProvider>
+      </Provider>
+    </ErrorBoundary>
+  );
+};
+
+export default App;

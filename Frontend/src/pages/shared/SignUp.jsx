@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaUser, FaEnvelope, FaLock, FaPhoneAlt, FaArrowRight, FaArrowLeft, FaVenusMars, FaTint, FaRulerVertical, FaWeight, FaBirthdayCake, FaHeartbeat, FaShieldAlt } from "react-icons/fa";
+import { FaUser, FaEnvelope, FaLock, FaPhoneAlt, FaArrowRight, FaArrowLeft, FaVenusMars, FaTint, FaRulerVertical, FaWeight, FaBirthdayCake, FaHeartbeat, FaShieldAlt, FaGoogle } from "react-icons/fa";
 import PasswordStrengthBar from "react-password-strength-bar";
 import { authService } from "../../services";
+import { useGoogleAuth } from "../../contexts/GoogleAuthContext";
+import { toast } from "react-hot-toast";
 
 const SignUp = () => {
   const navigate = useNavigate();
+  const { initiateGoogleLogin, loading: googleLoading } = useGoogleAuth();
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -29,18 +32,48 @@ const SignUp = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
-    setError(""); // Clear error when user types
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    
+    if (error) {
+      setError("");
+    }
   };
 
   const nextStep = () => {
-    // Validate first step before proceeding
     if (step === 1) {
-      if (!formData.fullName || !formData.email || !formData.password || passwordScore < 2) {
-        setError("Please fill all required fields with valid information");
+      setError("");
+      
+      if (!formData.fullName.trim()) {
+        setError("Please enter your full name");
+        return;
+      }
+      
+      if (!formData.email.trim()) {
+        setError("Please enter your email address");
+        return;
+      }
+      
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email.trim())) {
+        setError("Please enter a valid email address");
+        return;
+      }
+      
+      // Password is no longer required for Google signup
+      if (formData.password && passwordScore < 2) {
+        setError("Please choose a stronger password");
         return;
       }
     }
+    
+    if (step === 2 && !formData.gender) {
+      setError("Please select your gender");
+      return;
+    }
+    
     setStep(step + 1);
     setError("");
   };
@@ -56,12 +89,25 @@ const SignUp = () => {
     setError("");
 
     try {
-      // Create request payload with patient-specific fields
+      // Check required fields for API
+      if (!formData.fullName.trim()) {
+        throw new Error("Please enter your full name");
+      }
+      
+      if (!formData.email.trim()) {
+        throw new Error("Please enter your email address");
+      }
+      
+      if (!formData.gender) {
+        throw new Error("Please select your gender");
+      }
+
       const patientData = {
         name: formData.fullName,
         email: formData.email,
-        password: formData.password,
         gender: formData.gender,
+        // Optional fields
+        password: formData.password,
         mobile: formData.phoneNumber,
         age: formData.age,
         bloodGroup: formData.bloodGroup,
@@ -69,14 +115,9 @@ const SignUp = () => {
         weight: formData.weight,
       };
 
-      console.log("Registering with data:", patientData);
-
-      // Register patient using our API service
       const data = await authService.register(patientData);
-
-      console.log("Registration successful:", data);
       
-      // Navigate to login page after successful registration
+      toast.success("Registration successful! Please login with your credentials.");
       navigate("/login", { 
         state: { 
           success: true, 
@@ -84,13 +125,37 @@ const SignUp = () => {
         } 
       });
     } catch (error) {
-      console.error("Registration error:", error);
-      setError(
-        error.response?.data?.message || "Registration failed. Please try again."
-      );
+      setError(error.response?.data?.message || error.message || "Registration failed. Please try again.");
+      toast.error(error.response?.data?.message || error.message || "Registration failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleGoogleSignUp = async () => {
+    try {
+      setIsLoading(true);
+      setError("");
+      
+      console.log("Initiating Google OAuth flow for signup");
+      
+      // Store a flag to indicate we're in the signup flow
+      sessionStorage.setItem('googleSignupFlow', 'true');
+      
+      // Call initiateGoogleLogin from GoogleAuthContext
+      // This will redirect the user to Google's OAuth page
+      await initiateGoogleLogin();
+      
+      // The rest of the auth flow will be handled by the GoogleOAuthCallback component
+      // when Google redirects back to our callback URL
+    } catch (error) {
+      console.error("Google signup error:", error);
+      toast.error(error.message || "Google sign-up failed");
+      setError(error.message || "Google sign-up failed");
+      setIsLoading(false);
+    }
+    // Note: We don't call setIsLoading(false) in the success path
+    // because the page will redirect to Google
   };
 
   const renderStepIndicator = () => {
@@ -176,6 +241,37 @@ const SignUp = () => {
           </h2>
           <p className="text-gray-500 text-center mb-8">Create your account to get started</p>
           
+          {/* Google Sign-up Button */}
+          <motion.button
+            onClick={handleGoogleSignUp}
+            disabled={isLoading || googleLoading}
+            className="w-full flex items-center justify-center space-x-2 bg-white border-2 border-gray-300 text-gray-800 font-medium py-3 px-4 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition duration-300 mb-6"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            type="button"
+          >
+            {isLoading || googleLoading ? (
+              <svg className="animate-spin h-5 w-5 text-gray-800" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            ) : (
+              <>
+                <FaGoogle className="text-xl text-blue-600" />
+                <span>Sign up with Google</span>
+              </>
+            )}
+          </motion.button>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-white text-gray-500">Or fill in your details</span>
+            </div>
+          </div>
+          
           {renderStepIndicator()}
           
           {error && (
@@ -248,7 +344,7 @@ const SignUp = () => {
                   
                   <div>
                     <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                      Password <span className="text-red-500">*</span>
+                      Password
                     </label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -262,7 +358,6 @@ const SignUp = () => {
                         onChange={handleChange}
                         className="pl-10 pr-4 py-3 w-full border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                         placeholder="••••••••"
-                        required
                       />
                     </div>
                     <PasswordStrengthBar 
@@ -338,7 +433,6 @@ const SignUp = () => {
                           onChange={handleChange}
                           className="pl-10 pr-4 py-3 w-full border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                           placeholder="1234567890"
-                          required
                         />
                       </div>
                     </div>
@@ -489,4 +583,4 @@ const SignUp = () => {
   );
 };
 
-export default SignUp; 
+export default SignUp;

@@ -114,7 +114,9 @@ const Header = () => {
                         {isAuthenticated ? (
                             <>
                                 <Link 
-                                    to="/patient-dashboard" 
+                                    to={userRole === 'admin' ? '/admin-dashboard' : 
+                                        userRole === 'doctor' ? '/doctor-dashboard' : 
+                                        '/patient-dashboard'} 
                                     className={`px-5 py-2 rounded-full transition duration-300 text-sm font-medium shadow-md flex items-center ${
                                         isScrolled 
                                             ? 'bg-blue-600 text-white hover:bg-blue-700'
@@ -222,7 +224,9 @@ const Header = () => {
                                 
                                 {isAuthenticated && (
                                     <Link 
-                                        to="/patient-dashboard" 
+                                        to={userRole === 'admin' ? '/admin-dashboard' : 
+                                            userRole === 'doctor' ? '/doctor-dashboard' : 
+                                            '/patient-dashboard'} 
                                         className="flex items-center p-3 my-1 rounded-lg bg-blue-50 text-blue-700"
                                         onClick={() => setIsMenuOpen(false)}
                                     >
