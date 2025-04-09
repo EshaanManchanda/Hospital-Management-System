@@ -1,0 +1,59 @@
+[
+    {
+      "patient": "USR-12345678",  
+      "doctor": "USR-12345678",   
+      "diagnosis": "Hypertension",
+      "medicines": [
+        {
+          "medicine": "MED-123456",  
+          "dosage": "500mg",
+          "frequency": "Twice a day",
+          "duration": "30 days",
+          "notes": "Take with food to avoid stomach upset."
+        },
+        {
+          "medicine": "MED-654321",  
+          "dosage": "10mg",
+          "frequency": "Once a day",
+          "duration": "30 days",
+          "notes": "Take in the morning."
+        }
+      ],
+      "instructions": "Monitor blood pressure daily and maintain a low-salt diet.",
+      "startDate": "2025-04-09T00:00:00Z",
+      "endDate": "2025-05-09T00:00:00Z",
+      "followUpDate": "2025-05-10T00:00:00Z",
+      "status": "active",
+      "createdAt": "2025-04-09T10:00:00Z",
+      "updatedAt": "2025-04-09T10:00:00Z"
+    },
+    {
+      "patient": "USR-12345679",  
+      "doctor": "USR-12345678",   
+      "diagnosis": "Diabetes",
+      "medicines": [
+        {
+          "medicine": "MED-112233",  
+          "dosage": "500mg",
+          "frequency": "Three times a day",
+          "duration": "60 days",
+          "notes": "Take before meals."
+        },
+        {
+          "medicine": "MED-332211",  
+          "dosage": "20mg",
+          "frequency": "Once a day",
+          "duration": "60 days",
+          "notes": "Take at bedtime."
+        }
+      ],
+      "instructions": "Monitor blood sugar levels regularly and follow a controlled diet.",
+      "startDate": "2025-04-09T00:00:00Z",
+      "endDate": "2025-06-09T00:00:00Z",
+      "followUpDate": "2025-06-10T00:00:00Z",
+      "status": "active",
+      "createdAt": "2025-04-09T12:00:00Z",
+      "updatedAt": "2025-04-09T12:00:00Z"
+    }
+  ]
+  

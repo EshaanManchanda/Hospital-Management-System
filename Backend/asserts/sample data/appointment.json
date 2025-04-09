@@ -1,0 +1,37 @@
+[
+    {
+      "patient": "USR-12345678", 
+      "doctor": "USR-12345678",   
+      "date": "2025-04-10T10:00:00Z",
+      "time": "10:00 AM",
+      "status": "scheduled",
+      "type": "regular",
+      "description": "Routine checkup for blood pressure and sugar level.",
+      "symptoms": "None",
+      "diagnosis": "No issues detected.",
+      "prescription": "None",
+      "notes": "Patient is in good health.",
+      "followUpDate": "2025-05-10T10:00:00Z",
+      "paymentStatus": "pending",
+      "paymentAmount": 100,
+      "createdAt": "2025-04-01T10:00:00Z"
+    },
+    {
+      "patient": "USR-12345679",  
+      "doctor": "USR-12345678",   
+      "date": "2025-04-12T14:00:00Z",
+      "time": "2:00 PM",
+      "status": "scheduled",
+      "type": "follow-up",
+      "description": "Follow-up appointment for diabetes management.",
+      "symptoms": "Mild dizziness and fatigue.",
+      "diagnosis": "Ongoing treatment for diabetes.",
+      "prescription": "Increase insulin dosage by 10%",
+      "notes": "Monitor blood sugar levels regularly.",
+      "followUpDate": "2025-05-12T14:00:00Z",
+      "paymentStatus": "paid",
+      "paymentAmount": 150,
+      "createdAt": "2025-04-03T12:00:00Z"
+    }
+  ]
+  
