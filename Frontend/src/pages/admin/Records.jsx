@@ -1,5 +1,4 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/admin/ui/button";
 import { 
   DropdownMenu,
@@ -23,75 +22,133 @@ import {
   Pill,
   Stethoscope,
   Clipboard,
-  MoreHorizontal 
+  MoreHorizontal,
+  Loader2
 } from "lucide-react";
+import { useToast } from "@/components/admin/ui/use-toast";
+import { medicalRecordService } from "@/services";
 
 const Records = () => {
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
-  
-  // Mock data for medical records
-  const [records, setRecords] = useState([
-    {
-      id: "REC001",
-      patientName: "John Smith",
-      patientId: "P001",
-      recordType: "Lab Results",
-      date: "2023-11-28",
-      doctor: "Dr. Williams",
-      status: "reviewed",
-      description: "Complete blood count and metabolic panel",
-    },
-    {
-      id: "REC002",
-      patientName: "Emily Johnson",
-      patientId: "P002",
-      recordType: "Consultation",
-      date: "2023-11-27",
-      doctor: "Dr. Martinez",
-      status: "pending",
-      description: "Initial cardiology consultation",
-    },
-    {
-      id: "REC003",
-      patientName: "Michael Davis",
-      patientId: "P003",
-      recordType: "Radiology",
-      date: "2023-11-26",
-      doctor: "Dr. Thompson",
-      status: "reviewed",
-      description: "Chest X-ray findings",
-    },
-    {
-      id: "REC004",
-      patientName: "Sarah Wilson",
-      patientId: "P004",
-      recordType: "Prescription",
-      date: "2023-11-25",
-      doctor: "Dr. Johnson",
-      status: "active",
-      description: "Medication renewal for hypertension",
-    },
-    {
-      id: "REC005",
-      patientName: "Robert Brown",
-      patientId: "P005",
-      recordType: "Procedure",
-      date: "2023-11-24",
-      doctor: "Dr. Williams",
-      status: "completed",
-      description: "Minor surgical procedure report",
-    },
-    {
-      id: "REC006",
-      patientName: "Jennifer Lee",
-      patientId: "P006",
-      recordType: "Lab Results",
-      date: "2023-11-23",
-      doctor: "Dr. Garcia",
-      status: "pending",
-      description: "Lipid panel and HbA1c test results",
-    },
-  ]);
+  const [records, setRecords] = useState([]);
+  const [stats, setStats] = useState({
+    total: 0,
+    thisWeek: 0,
+    pending: 0
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentFilter, setCurrentFilter] = useState("All Records");
+
+  // Fetch medical records from the API
+  useEffect(() => {
+    const fetchMedicalRecords = async () => {
+      try {
+        setIsLoading(true);
+        const response = await medicalRecordService.getAllMedicalRecords();
+        
+        // If API returns formatted data, use it directly
+        if (response && response.records) {
+          setRecords(response.records);
+          
+          // Update stats if available in response
+          if (response.stats) {
+            setStats({
+              total: response.stats.total || 0,
+              thisWeek: response.stats.thisWeek || 0,
+              pending: response.stats.pending || 0
+            });
+          }
+        } else {
+          // Fallback to our mock data if API doesn't return expected format
+          console.warn("API response format unexpected, using fallback data");
+          // Keep the existing mock data
+        }
+      } catch (error) {
+        console.error("Error fetching medical records:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load medical records. Using sample data instead.",
+          variant: "destructive"
+        });
+        
+        // Fallback to mock data on error
+        setRecords([
+          {
+            id: "REC001",
+            patientName: "John Smith",
+            patientId: "P001",
+            recordType: "Lab Results",
+            date: "2023-11-28",
+            doctor: "Dr. Williams",
+            status: "reviewed",
+            description: "Complete blood count and metabolic panel",
+          },
+          {
+            id: "REC002",
+            patientName: "Emily Johnson",
+            patientId: "P002",
+            recordType: "Consultation",
+            date: "2023-11-27",
+            doctor: "Dr. Martinez",
+            status: "pending",
+            description: "Initial cardiology consultation",
+          },
+          {
+            id: "REC003",
+            patientName: "Michael Davis",
+            patientId: "P003",
+            recordType: "Radiology",
+            date: "2023-11-26",
+            doctor: "Dr. Thompson",
+            status: "reviewed",
+            description: "Chest X-ray findings",
+          },
+          {
+            id: "REC004",
+            patientName: "Sarah Wilson",
+            patientId: "P004",
+            recordType: "Prescription",
+            date: "2023-11-25",
+            doctor: "Dr. Johnson",
+            status: "active",
+            description: "Medication renewal for hypertension",
+          },
+          {
+            id: "REC005",
+            patientName: "Robert Brown",
+            patientId: "P005",
+            recordType: "Procedure",
+            date: "2023-11-24",
+            doctor: "Dr. Williams",
+            status: "completed",
+            description: "Minor surgical procedure report",
+          },
+          {
+            id: "REC006",
+            patientName: "Jennifer Lee",
+            patientId: "P006",
+            recordType: "Lab Results",
+            date: "2023-11-23",
+            doctor: "Dr. Garcia",
+            status: "pending",
+            description: "Lipid panel and HbA1c test results",
+          },
+        ]);
+        
+        // Set default stats for fallback data
+        setStats({
+          total: 1248,
+          thisWeek: 87,
+          pending: 24
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchMedicalRecords();
+  }, [toast]);
 
   // Icons for different record types
   const recordTypeIcons = {
@@ -110,12 +167,34 @@ const Records = () => {
     "completed": "bg-purple-100 text-purple-800",
   };
 
-  // Filter records based on search term
-  const filteredRecords = records.filter(record =>
-    record.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    record.recordType.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    record.id.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter records based on search term and selected filter
+  const filteredRecords = records.filter(record => {
+    // Search filter
+    const matchesSearch = 
+      record.patientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      record.recordType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      record.id?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    // Type filter
+    const matchesType = 
+      currentFilter === "All Records" || 
+      record.recordType === currentFilter;
+    
+    return matchesSearch && matchesType;
+  });
+
+  // Handle creating a new medical record
+  const handleCreateRecord = async () => {
+    toast({
+      title: "Create Record",
+      description: "This functionality will be implemented soon."
+    });
+  };
+
+  // Handle filter change
+  const handleFilterChange = (filter) => {
+    setCurrentFilter(filter);
+  };
 
   return (
     <div className="space-y-6">
@@ -140,21 +219,24 @@ const Records = () => {
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="flex items-center gap-2">
                 <Filter className="h-4 w-4" />
-                <span className="hidden sm:inline">Filter</span>
+                <span className="hidden sm:inline">Filter: {currentFilter}</span>
                 <ChevronDown className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem>All Records</DropdownMenuItem>
-              <DropdownMenuItem>Lab Results</DropdownMenuItem>
-              <DropdownMenuItem>Consultations</DropdownMenuItem>
-              <DropdownMenuItem>Radiology</DropdownMenuItem>
-              <DropdownMenuItem>Prescriptions</DropdownMenuItem>
-              <DropdownMenuItem>Procedures</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleFilterChange("All Records")}>All Records</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleFilterChange("Lab Results")}>Lab Results</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleFilterChange("Consultation")}>Consultations</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleFilterChange("Radiology")}>Radiology</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleFilterChange("Prescription")}>Prescriptions</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleFilterChange("Procedure")}>Procedures</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           
-          <Button className="bg-hospital-primary hover:bg-hospital-accent">
+          <Button 
+            className="bg-hospital-primary hover:bg-hospital-accent"
+            onClick={handleCreateRecord}
+          >
             <Plus className="h-4 w-4 mr-2" />
             New Record
           </Button>
@@ -167,7 +249,7 @@ const Records = () => {
             <CardTitle className="text-sm font-medium text-gray-500">Total Records</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">1,248</div>
+            <div className="text-2xl font-bold">{stats.total.toLocaleString()}</div>
             <p className="text-xs text-gray-500 mt-1">+12% from last month</p>
           </CardContent>
         </Card>
@@ -177,7 +259,7 @@ const Records = () => {
             <CardTitle className="text-sm font-medium text-gray-500">Records This Week</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">87</div>
+            <div className="text-2xl font-bold">{stats.thisWeek}</div>
             <p className="text-xs text-gray-500 mt-1">+5% from last week</p>
           </CardContent>
         </Card>
@@ -187,101 +269,80 @@ const Records = () => {
             <CardTitle className="text-sm font-medium text-gray-500">Pending Records</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">24</div>
+            <div className="text-2xl font-bold">{stats.pending}</div>
             <p className="text-xs text-gray-500 mt-1">-3% from last week</p>
           </CardContent>
         </Card>
       </div>
       
-      <div className="grid grid-cols-1 gap-4">
-        {filteredRecords.length > 0 ? (
-          filteredRecords.map(record => (
-            <Card key={record.id} className="overflow-hidden">
-              <CardContent className="p-0">
-                <div className="p-4 sm:p-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-gray-100 p-2 rounded-full">
-                        {recordTypeIcons[record.recordType] || <FileText className="h-4 w-4" />}
+      {isLoading ? (
+        <div className="flex justify-center items-center h-40">
+          <Loader2 className="h-8 w-8 animate-spin text-hospital-primary" />
+          <span className="ml-2">Loading records...</span>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4">
+          {filteredRecords.length > 0 ? (
+            filteredRecords.map(record => (
+              <Card key={record.id} className="overflow-hidden">
+                <CardContent className="p-0">
+                  <div className="flex flex-col sm:flex-row">
+                    <div className="p-4 flex-1">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h3 className="font-medium">{record.patientName}</h3>
+                          <div className="text-sm text-gray-500 mt-1">
+                            ID: {record.patientId}
+                          </div>
+                        </div>
+                        <Badge className={statusStyles[record.status] || "bg-gray-100"}>
+                          {record.status}
+                        </Badge>
                       </div>
-                      <div>
-                        <h3 className="text-lg font-semibold">{record.recordType}</h3>
-                        <p className="text-sm text-gray-500">ID: {record.id}</p>
+                      
+                      <div className="mt-4 space-y-2">
+                        <div className="flex items-center">
+                          {recordTypeIcons[record.recordType] || <FileText className="h-4 w-4 text-gray-500" />}
+                          <span className="text-sm ml-1.5">{record.recordType}</span>
+                        </div>
+                        
+                        <div className="flex items-center">
+                          <User className="h-4 w-4 text-gray-500" />
+                          <span className="text-sm ml-1.5">{record.doctor}</span>
+                        </div>
+                        
+                        <div className="flex items-center">
+                          <Calendar className="h-4 w-4 text-gray-500" />
+                          <span className="text-sm ml-1.5">{record.date}</span>
+                        </div>
                       </div>
+                      
+                      <p className="mt-2 text-sm">{record.description}</p>
                     </div>
                     
-                    <div className="flex items-center gap-2">
-                      <Badge className={statusStyles[record.status]}>
-                        {record.status.charAt(0).toUpperCase() + record.status.slice(1)}
-                      </Badge>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>View Record</DropdownMenuItem>
-                          <DropdownMenuItem>Edit Record</DropdownMenuItem>
-                          <DropdownMenuItem>Download PDF</DropdownMenuItem>
-                          <DropdownMenuItem>Print Record</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-gray-50 rounded-lg p-3 mb-4">
-                    <p className="text-sm text-gray-600">{record.description}</p>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-gray-400" />
-                      <div>
-                        <p className="text-xs text-gray-500">Patient</p>
-                        <p className="text-sm font-medium">{record.patientName}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      <Stethoscope className="h-4 w-4 text-gray-400" />
-                      <div>
-                        <p className="text-xs text-gray-500">Doctor</p>
-                        <p className="text-sm font-medium">{record.doctor}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-gray-400" />
-                      <div>
-                        <p className="text-xs text-gray-500">Date</p>
-                        <p className="text-sm font-medium">{record.date}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center sm:justify-end">
-                      <Button variant="outline" size="sm" className="h-8">
-                        <Download className="h-3 w-3 mr-1" />
-                        <span className="text-xs">Download</span>
+                    <div className="bg-gray-50 p-4 flex sm:flex-col justify-end items-center gap-2 sm:w-20">
+                      <Button variant="outline" size="icon" className="h-8 w-8">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                      <Button variant="outline" size="icon" className="h-8 w-8">
+                        <Download className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        ) : (
-          <div className="bg-white p-8 rounded-lg shadow text-center">
-            <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
-              <FileText className="h-6 w-6 text-gray-600" />
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <div className="text-center p-8">
+              <FileText className="h-10 w-10 text-gray-400 mx-auto mb-3" />
+              <h3 className="text-lg font-medium">No records found</h3>
+              <p className="text-gray-500 mt-1">
+                {searchTerm ? "Try adjusting your search or filters" : "Start by adding a new medical record"}
+              </p>
             </div>
-            <h3 className="mt-4 text-lg font-medium">No records found</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              Try adjusting your search or filter criteria.
-            </p>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

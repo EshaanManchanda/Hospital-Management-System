@@ -1,9 +1,5 @@
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
-import authService from '../services/authService';
-import patientService from '../services/patientService';
-import doctorService from '../services/doctorService';
-import appointmentService from '../services/appointmentService';
 
 // Get the API URL from environment variables or use the fallback
 const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -14,8 +10,7 @@ const apiBaseUrlWithoutApi = apiBaseUrl.endsWith('/api')
 
 console.log('API configured with:', { 
   baseUrl: apiBaseUrlWithoutApi,
-  withCredentials: true,
-  fullUrl: `${apiBaseUrlWithoutApi}/api/auth/login`
+  withCredentials: true
 });
 
 // Create axios instance
@@ -31,11 +26,14 @@ const api = axios.create({
 // Request interceptor for adding auth token
 api.interceptors.request.use(
   (config) => {
-    // Log all outgoing requests for debugging
-    console.log(`API Request: ${config.method.toUpperCase()} ${config.baseURL}${config.url}`, {
-      headers: config.headers,
-      withCredentials: config.withCredentials
-    });
+    // Log all outgoing requests for debugging if in development
+    if (import.meta.env.DEV) {
+      console.log(`API Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`, {
+        headers: config.headers,
+        withCredentials: config.withCredentials,
+        data: config.data
+      });
+    }
     
     // Get token from localStorage
     const token = localStorage.getItem('token');
@@ -53,74 +51,106 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor for handling errors
+// Response interceptor for handling common errors
 api.interceptors.response.use(
   (response) => {
-    // Log successful responses
-    console.log(`API Response Success: ${response.config.method.toUpperCase()} ${response.config.url}`, {
-      status: response.status,
-      data: response.data
-    });
+    // Log response in development
+    if (import.meta.env.DEV) {
+      console.log('API Response:', {
+        status: response.status,
+        url: response.config.url,
+        data: response.data
+      });
+    }
     return response;
   },
   (error) => {
-    console.error('API Response Error:', error);
-    
-    // Handle specific error cases
+    // Handle different error responses
     if (error.response) {
       // The request was made and the server responded with a status code
       // that falls out of the range of 2xx
-      console.error('Response data:', error.response.data);
-      console.error('Response status:', error.response.status);
-      console.error('Request URL:', error.config.baseURL + error.config.url);
+      const { status, data } = error.response;
       
-      // Handle authentication errors
-      if (error.response.status === 401) {
-        console.error('Authentication Error Details:', {
-          url: error.config.url,
-          method: error.config.method,
-          data: error.config.data,
-          message: error.response.data.message || 'Authentication failed'
-        });
-        
-        // Check if it's a token expiration error or invalid credentials
-        if (error.response.data.message && 
-            (error.response.data.message.includes('expired') || 
-             error.response.data.message.includes('invalid token'))) {
-          toast.error('Your session has expired. Please login again.');
-          // Clear auth data
+      switch (status) {
+        case 401:
+          // Unauthorized: Token expired or invalid
           localStorage.removeItem('token');
           localStorage.removeItem('userData');
           
-          // Redirect to login after a short delay
-          setTimeout(() => {
-            window.location.href = '/login';
-          }, 1500);
-        } else {
-          // Most likely invalid credentials - don't show toast here
-          // Let the login component handle the error message
-          console.error('Login credentials error:', error.response.data.message || 'Invalid credentials');
-        }
+          // Only show toast if we're not already on the login page
+          if (!window.location.pathname.includes('/login')) {
+            toast.error('Your session has expired. Please log in again.', {
+              duration: 5000
+            });
+            
+            // Redirect to login after 1 second
+            setTimeout(() => {
+              window.location.href = '/login';
+            }, 1000);
+          }
+          break;
+          
+        case 403:
+          // Forbidden: User doesn't have permission
+          toast.error('You do not have permission to perform this action.', {
+            duration: 5000
+          });
+          break;
+          
+        case 404:
+          // Not found
+          console.error('Resource not found:', data);
+          break;
+          
+        case 422:
+          // Validation errors
+          if (data.errors) {
+            const errorMessages = Object.values(data.errors)
+              .flat()
+              .join(', ');
+            toast.error(`Validation error: ${errorMessages}`, {
+              duration: 5000
+            });
+          } else {
+            toast.error('Validation failed. Please check your input.', {
+              duration: 5000
+            });
+          }
+          break;
+          
+        case 500:
+          // Server error
+          toast.error('Server error occurred. Please try again later.', {
+            duration: 5000
+          });
+          break;
+          
+        default:
+          // Other errors
+          if (data.message) {
+            toast.error(data.message, {
+              duration: 5000
+            });
+          } else {
+            toast.error('An error occurred. Please try again.', {
+              duration: 5000
+            });
+          }
       }
     } else if (error.request) {
       // The request was made but no response was received
-      console.error('Request made but no response received:', error.request);
-      toast.error('No response from server. Please check your connection and make sure the backend is running.');
+      toast.error('Network error. Please check your connection.', {
+        duration: 5000
+      });
     } else {
       // Something happened in setting up the request that triggered an Error
-      console.error('Error setting up request:', error.message);
+      toast.error('Application error. Please try again.', {
+        duration: 5000
+      });
     }
     
     return Promise.reject(error);
   }
 );
-
-// Re-export the services from the services directory
-export {
-  authService,
-  patientService,
-  doctorService,
-  appointmentService
-};
 
 export default api;

@@ -12,6 +12,8 @@ import { useAuth } from '../../contexts/AuthContext';
 const schema = yup.object().shape({
   name: yup.string().required('Name is required'),
   email: yup.string().email('Email is not valid').required('Email is required'),
+  mobile: yup.string().required('Mobile number is required'),
+  gender: yup.string().required('Gender is required'),
   password: yup.string()
     .min(6, 'Password must be at least 6 characters')
     .required('Password is required'),
@@ -30,7 +32,8 @@ const SignupForm = () => {
   const { register, handleSubmit, formState: { errors } } = useForm({
     resolver: yupResolver(schema),
     defaultValues: {
-      role: 'patient'
+      role: 'patient',
+      gender: 'male'
     }
   });
 
@@ -40,11 +43,27 @@ const SignupForm = () => {
       // Remove confirmPassword as it's not needed for the API
       const { confirmPassword, ...signupData } = data;
       
-      // Try to register the user
-      const response = await authService.register(signupData);
+      // Add additional required fields
+      const formattedData = {
+        ...signupData,
+        dateOfBirth: new Date().toISOString(), // Default to current date, you may want to add a date picker
+        address: {
+          street: '',
+          city: '',
+          state: '',
+          zipCode: '',
+          country: ''
+        }
+      };
       
-      if (response.success && response.user) {
-        const user = response.user;
+      // Debug what's being sent
+      console.log('Sending registration data:', formattedData);
+      
+      // Try to register the user
+      const response = await authService.register(formattedData);
+      
+      if (response.success && response.data?.user) {
+        const user = response.data.user;
         toast.success('Registration successful! Redirecting to your dashboard...');
         
         // Redirect based on role
@@ -105,6 +124,38 @@ const SignupForm = () => {
           />
           {errors.email && (
             <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
+          )}
+        </div>
+
+        <div className="mb-6">
+          <label className="block mb-2 text-sm font-medium text-gray-900">
+            Mobile Number
+          </label>
+          <input
+            type="text"
+            {...register('mobile')}
+            className={`bg-gray-50 border ${errors.mobile ? 'border-red-500' : 'border-gray-300'} text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5`}
+            placeholder="1234567890"
+          />
+          {errors.mobile && (
+            <p className="mt-1 text-sm text-red-600">{errors.mobile.message}</p>
+          )}
+        </div>
+
+        <div className="mb-6">
+          <label className="block mb-2 text-sm font-medium text-gray-900">
+            Gender
+          </label>
+          <select
+            {...register('gender')}
+            className={`bg-gray-50 border ${errors.gender ? 'border-red-500' : 'border-gray-300'} text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5`}
+          >
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="other">Other</option>
+          </select>
+          {errors.gender && (
+            <p className="mt-1 text-sm text-red-600">{errors.gender.message}</p>
           )}
         </div>
 

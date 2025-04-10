@@ -1,9 +1,10 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import authService from '../services/authService';
+import { authService } from '../services';
 
 const AuthContext = createContext();
+export { AuthContext }; // Export the context itself
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -11,12 +12,18 @@ export const AuthProvider = ({ children }) => {
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
+  console.log('AuthProvider mounting/rendering');
+
   useEffect(() => {
     const checkAuthStatus = async () => {
+      console.log('AuthProvider: Checking auth status');
       try {
         // Check for token in localStorage
         const token = localStorage.getItem('token');
         const userData = localStorage.getItem('userData');
+        
+        console.log('AuthProvider: Token exists:', !!token);
+        console.log('AuthProvider: UserData exists:', !!userData);
         
         if (!token) {
           console.log('No token found in localStorage');
@@ -37,12 +44,39 @@ export const AuthProvider = ({ children }) => {
         
         console.log('Token format is valid, verifying with server');
         
-        // Verify token with server and get user data
-        const userInfo = await authService.verifyToken();
-        
-        // If we get here, token is valid
-        console.log('Token verified successfully, user:', userInfo.id);
-        setUser(userInfo);
+        try {
+          // Verify token with server and get user data
+          const userInfo = await authService.verifyToken();
+          
+          // If we get here, token is valid
+          console.log('AuthProvider: Token verified successfully, user:', userInfo);
+          setUser(userInfo);
+        } catch (verifyError) {
+          console.error('AuthProvider: Token verification failed:', verifyError.message);
+          
+          // If we have userData in localStorage, try using that as a fallback
+          if (userData) {
+            try {
+              const parsedUserData = JSON.parse(userData);
+              console.log('AuthProvider: Using cached userData as fallback:', parsedUserData);
+              setUser(parsedUserData);
+              
+              // Still notify the user their session might need refreshing
+              toast.warning('Session verification failed. Some features may be unavailable.', {
+                duration: 5000,
+                position: 'bottom-center'
+              });
+            } catch (parseError) {
+              console.error('Failed to parse userData from localStorage:', parseError);
+              localStorage.removeItem('userData');
+              toast.error('Your session has expired. Please log in again.');
+            }
+          } else {
+            // No userData fallback, clear auth data
+            localStorage.removeItem('token');
+            toast.error('Your session has expired. Please log in again.');
+          }
+        }
       } catch (err) {
         console.error('Auth check failed:', err.message);
         // Clear invalid auth data
@@ -123,13 +157,47 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      await authService.logout();
+      console.log('AuthContext: Starting logout process');
+      // Call the authService logout function
+      const result = await authService.logout();
+      console.log('AuthContext: Logout service result:', result);
+      
+      // Clear user state
       setUser(null);
-      navigate('/');
+      
+      // Make sure localStorage is cleared completely
+      localStorage.removeItem('token');
+      localStorage.removeItem('userData');
+      localStorage.removeItem('user');
+      localStorage.removeItem('userRole');
+      
+      // Clear any session storage data too
+      sessionStorage.removeItem('redirectAfterLogin');
+      
+      // Navigate to login page rather than home
+      console.log('AuthContext: Redirecting to login page');
+      navigate('/login');
+      
+      // Show success message
       toast.success('You have been logged out successfully');
+      return true;
     } catch (error) {
-      console.error('Logout error:', error);
-      toast.error('Error during logout');
+      console.error('AuthContext: Logout error:', error);
+      
+      // Even if there's an error, clear user state and storage
+      setUser(null);
+      localStorage.removeItem('token');
+      localStorage.removeItem('userData');
+      localStorage.removeItem('user');
+      localStorage.removeItem('userRole');
+      sessionStorage.removeItem('redirectAfterLogin');
+      
+      // Show error message
+      toast.error('Error during logout, but you have been logged out locally');
+      
+      // Redirect to login page regardless
+      navigate('/login');
+      return false;
     }
   };
 
@@ -158,6 +226,12 @@ export const AuthProvider = ({ children }) => {
         toast.error(errorMessage);
         setLoading(false);
         return false;
+      }
+      
+      // Check if this registration should skip auth redirects (for admin-created patients)
+      if (response.skipAuthRedirect || userData.skipAuthRedirect) {
+        console.log("Registration successful but skipping auth redirect and login");
+        return true;
       }
       
       // Get user data from response

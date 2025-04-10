@@ -1,5 +1,4 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Table, 
   TableBody, 
@@ -33,7 +32,7 @@ import {
   SelectValue,
 } from "@/components/admin/ui/select";
 import { Badge } from "@/components/admin/ui/badge";
-import { toast } from "@/components/admin/ui/use-toast";
+import { useToast } from "@/components/admin/ui/use-toast";
 import { 
   Search, 
   MoreHorizontal,
@@ -42,13 +41,15 @@ import {
   Trash2,
   Filter,
   ChevronDown,
-  ShoppingCart
+  ShoppingCart,
+  Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AddMedicationForm from "@/components/admin/pharmacy/AddMedicationForm";
+import { pharmacyService } from "@/services";
 
-// Mock pharmacy inventory data
-const medications = [
+// Mock pharmacy inventory data for fallback
+const fallbackMedications = [
   {
     id: "M001",
     name: "Amoxicillin",
@@ -112,6 +113,7 @@ const statusStyles = {
 };
 
 const Pharmacy = () => {
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedMedicationId, setSelectedMedicationId] = useState(null);
@@ -120,12 +122,96 @@ const Pharmacy = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [medicationsData, setMedicationsData] = useState(medications);
+  const [medicationsData, setMedicationsData] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalItems: 0,
+    lowStock: 0,
+    outOfStock: 0
+  });
+
+  // Fetch medications from API
+  useEffect(() => {
+    const fetchMedications = async () => {
+      try {
+        setIsLoading(true);
+        const response = await pharmacyService.getAllMedicines();
+        
+        if (response && response.medicines) {
+          // Format the data if needed
+          const formattedData = response.medicines.map(med => ({
+            id: med._id || med.id,
+            name: med.name,
+            category: med.category,
+            stock: med.stock,
+            price: typeof med.price === 'number' ? `$${med.price.toFixed(2)}` : med.price,
+            supplier: med.supplier,
+            status: determineStockStatus(med.stock, med.lowStockThreshold || 50)
+          }));
+          
+          setMedicationsData(formattedData);
+          
+          // Update stats if available
+          if (response.stats) {
+            setStats({
+              totalItems: response.stats.totalItems || 0,
+              lowStock: response.stats.lowStock || 0,
+              outOfStock: response.stats.outOfStock || 0
+            });
+          } else {
+            // Calculate stats from the data
+            calculateStats(formattedData);
+          }
+        } else {
+          console.warn("API response format unexpected, using fallback data");
+          // Fallback to mock data
+          setMedicationsData(fallbackMedications);
+          calculateStats(fallbackMedications);
+        }
+      } catch (error) {
+        console.error("Error fetching medications:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load medications. Using sample data instead.",
+          variant: "destructive"
+        });
+        
+        // Fallback to mock data on error
+        setMedicationsData(fallbackMedications);
+        calculateStats(fallbackMedications);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchMedications();
+  }, [toast]);
+
+  // Determine stock status based on quantity
+  const determineStockStatus = (stock, threshold) => {
+    if (stock <= 0) return "out-of-stock";
+    if (stock < threshold) return "low-stock";
+    return "in-stock";
+  };
+
+  // Calculate inventory statistics
+  const calculateStats = (medications) => {
+    const total = medications.length;
+    const lowStock = medications.filter(med => med.status === "low-stock").length;
+    const outOfStock = medications.filter(med => med.status === "out-of-stock").length;
+    
+    setStats({
+      totalItems: total,
+      lowStock,
+      outOfStock
+    });
+  };
 
   // Filter medications based on search term and status filter
   const filteredMedications = medicationsData.filter(
     (medication) => {
-      const matchesSearch = medication.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      const matchesSearch = 
+        medication.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         medication.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
         medication.id.toLowerCase().includes(searchTerm.toLowerCase());
       
@@ -135,19 +221,34 @@ const Pharmacy = () => {
     }
   );
 
-  const handleStatusChange = (medicationId, newStatus) => {
-    setMedicationsData(prevData => 
-      prevData.map(medication => 
-        medication.id === medicationId 
-          ? { ...medication, status: newStatus } 
-          : medication
-      )
-    );
-    
-    toast({
-      title: "Status Updated",
-      description: "Medication status has been updated successfully.",
-    });
+  const handleStatusChange = async (medicationId, newStatus) => {
+    try {
+      // First update UI optimistically
+      setMedicationsData(prevData => 
+        prevData.map(medication => 
+          medication.id === medicationId 
+            ? { ...medication, status: newStatus } 
+            : medication
+        )
+      );
+      
+      // Then call the API
+      await pharmacyService.updateMedicine(medicationId, { status: newStatus });
+      
+      toast({
+        title: "Status Updated",
+        description: "Medication status has been updated successfully.",
+      });
+    } catch (error) {
+      console.error("Error updating medication status:", error);
+      
+      // Revert the optimistic update on error
+      toast({
+        title: "Update Failed",
+        description: "Failed to update medication status. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleUpdateStock = (medication) => {
@@ -160,49 +261,184 @@ const Pharmacy = () => {
     setIsEditModalOpen(true);
   };
 
-  const handleDeleteMedication = () => {
+  const handleDeleteMedication = async () => {
     if (!selectedMedicationId) return;
     
-    setMedicationsData(prevData => 
-      prevData.filter(medication => medication.id !== selectedMedicationId)
-    );
-    
-    setIsDeleteDialogOpen(false);
-    setSelectedMedicationId(null);
-    
-    toast({
-      title: "Medication Deleted",
-      description: "The medication has been deleted successfully.",
-    });
+    try {
+      // Call the API to delete the medication
+      await pharmacyService.deleteMedicine(selectedMedicationId);
+      
+      // Update the UI after successful deletion
+      setMedicationsData(prevData => 
+        prevData.filter(medication => medication.id !== selectedMedicationId)
+      );
+      
+      setIsDeleteDialogOpen(false);
+      setSelectedMedicationId(null);
+      
+      toast({
+        title: "Medication Deleted",
+        description: "The medication has been deleted successfully.",
+      });
+      
+      // Recalculate statistics
+      calculateStats(
+        medicationsData.filter(medication => medication.id !== selectedMedicationId)
+      );
+    } catch (error) {
+      console.error("Error deleting medication:", error);
+      
+      toast({
+        title: "Delete Failed",
+        description: "Failed to delete medication. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleAddMedication = (newMedication) => {
-    setMedicationsData(prev => [
-      ...prev,
-      { ...newMedication, id: `M00${prev.length + 1}` }
-    ]);
-    setIsAddModalOpen(false);
-    
-    toast({
-      title: "Medication Added",
-      description: "New medication has been added successfully.",
-    });
+  const handleAddMedication = async (newMedication) => {
+    try {
+      // Call the API to add the medication
+      const response = await pharmacyService.createMedicine(newMedication);
+      
+      // Update the UI with the new medication from the API response
+      if (response && response.medicine) {
+        // Format the new medication data
+        const formattedMedication = {
+          id: response.medicine._id || response.medicine.id,
+          name: response.medicine.name,
+          category: response.medicine.category,
+          stock: response.medicine.stock,
+          price: typeof response.medicine.price === 'number' 
+            ? `$${response.medicine.price.toFixed(2)}` 
+            : response.medicine.price,
+          supplier: response.medicine.supplier,
+          status: determineStockStatus(
+            response.medicine.stock, 
+            response.medicine.lowStockThreshold || 50
+          )
+        };
+        
+        setMedicationsData(prev => [...prev, formattedMedication]);
+      } else {
+        // Fallback if API doesn't return the expected format
+        setMedicationsData(prev => [
+          ...prev,
+          { 
+            ...newMedication, 
+            id: `M00${prev.length + 1}`,
+            status: determineStockStatus(newMedication.stock, 50)
+          }
+        ]);
+      }
+      
+      setIsAddModalOpen(false);
+      
+      toast({
+        title: "Medication Added",
+        description: "New medication has been added successfully.",
+      });
+      
+      // Recalculate statistics
+      calculateStats([...medicationsData, newMedication]);
+    } catch (error) {
+      console.error("Error adding medication:", error);
+      
+      toast({
+        title: "Add Failed",
+        description: "Failed to add medication. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleUpdateMedication = (updatedMedication) => {
-    setMedicationsData(prevData => 
-      prevData.map(medication => 
-        medication.id === updatedMedication.id 
-          ? updatedMedication 
-          : medication
-      )
-    );
-    setIsEditModalOpen(false);
-    
-    toast({
-      title: "Medication Updated",
-      description: "Medication details have been updated successfully.",
-    });
+  const handleUpdateMedication = async (updatedMedication) => {
+    try {
+      // Call the API to update the medication
+      await pharmacyService.updateMedicine(
+        updatedMedication.id, 
+        updatedMedication
+      );
+      
+      // Update the UI after successful update
+      setMedicationsData(prevData => 
+        prevData.map(medication => 
+          medication.id === updatedMedication.id 
+            ? updatedMedication 
+            : medication
+        )
+      );
+      
+      setIsEditModalOpen(false);
+      
+      toast({
+        title: "Medication Updated",
+        description: "Medication details have been updated successfully.",
+      });
+      
+      // Recalculate statistics
+      calculateStats(
+        medicationsData.map(medication => 
+          medication.id === updatedMedication.id ? updatedMedication : medication
+        )
+      );
+    } catch (error) {
+      console.error("Error updating medication:", error);
+      
+      toast({
+        title: "Update Failed",
+        description: "Failed to update medication. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleStockUpdate = async (id, quantity) => {
+    try {
+      // Call the API to update the stock
+      await pharmacyService.updateStock(id, quantity);
+      
+      // Update the UI with the new stock level
+      setMedicationsData(prevData => 
+        prevData.map(medication => 
+          medication.id === id 
+            ? { 
+                ...medication, 
+                stock: medication.stock + quantity,
+                status: determineStockStatus(medication.stock + quantity, 50)
+              } 
+            : medication
+        )
+      );
+      
+      setIsViewModalOpen(false);
+      
+      toast({
+        title: "Stock Updated",
+        description: `Stock has been ${quantity >= 0 ? "increased" : "decreased"} successfully.`,
+      });
+      
+      // Recalculate statistics
+      calculateStats(
+        medicationsData.map(medication => 
+          medication.id === id 
+            ? { 
+                ...medication, 
+                stock: medication.stock + quantity,
+                status: determineStockStatus(medication.stock + quantity, 50)
+              } 
+            : medication
+        )
+      );
+    } catch (error) {
+      console.error("Error updating stock:", error);
+      
+      toast({
+        title: "Stock Update Failed",
+        description: "Failed to update stock. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (

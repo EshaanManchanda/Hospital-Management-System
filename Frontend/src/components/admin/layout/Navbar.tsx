@@ -22,6 +22,7 @@ import {
 import { SearchCommand } from "./SearchCommand";
 import { useToast } from "@/components/admin/ui/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/admin/ui/card";
+import authService from '@/services/authService';
 
 interface NavbarProps {
   toggleSidebar: () => void;
@@ -32,12 +33,30 @@ const Navbar: React.FC<NavbarProps> = ({ toggleSidebar }) => {
   const { toast } = useToast();
   const [searchOpen, setSearchOpen] = useState(false);
 
-  const handleLogout = () => {
-    toast({
-      title: "Logged out successfully",
-      description: "You have been logged out of your account.",
-    });
-    navigate("/login");
+  const handleLogout = async () => {
+    try {
+      console.log('Navbar: Initiating logout process');
+      // Use the authService logout function
+      const result = await authService.logout();
+      console.log('Navbar: Logout result:', result);
+      
+      // Show success message
+      toast({
+        title: "Logged out successfully",
+        description: "You have been logged out of your account.",
+      });
+      
+      // Redirect to login page
+      console.log('Navbar: Redirecting to login page');
+      navigate("/login");
+    } catch (error) {
+      console.error("Navbar: Logout failed:", error);
+      toast({
+        title: "Logout failed",
+        description: "There was a problem logging out. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleNavigation = (path: string) => {
