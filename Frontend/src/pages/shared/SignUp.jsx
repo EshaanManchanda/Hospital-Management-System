@@ -90,7 +90,7 @@ const SignUp = () => {
     setError("");
 
     try {
-      // Check required fields for API
+      // Basic client-side validation
       if (!formData.fullName.trim()) {
         throw new Error("Please enter your full name");
       }
@@ -98,29 +98,91 @@ const SignUp = () => {
       if (!formData.email.trim()) {
         throw new Error("Please enter your email address");
       }
-      
+
       if (!formData.gender) {
         throw new Error("Please select your gender");
       }
 
+      if (!formData.phoneNumber) {
+        throw new Error("Please enter your mobile number");
+      }
+
+      if (!formData.password) {
+        throw new Error("Please enter a password");
+      }
+
+      // Create patient data object with correct structure for backend
       const patientData = {
-        name: formData.fullName,
-        email: formData.email,
-        gender: formData.gender,
-        role: "patient",
-        password: formData.password,
-        mobile: formData.phoneNumber,
-        age: formData.age,
-        bloodGroup: formData.bloodGroup,
-        height: formData.height,
-        weight: formData.weight,
+        user: {
+          name: formData.fullName,
+          email: formData.email,
+          password: formData.password,
+          role: "patient",
+          mobile: formData.phoneNumber,
+          gender: formData.gender
+        },
+        medicalHistory: {
+          allergies: [],
+          chronicConditions: [],
+          surgeries: [],
+          medications: []
+        }
       };
 
-      console.log("Registering with data:", { ...patientData, password: patientData.password ? '********' : undefined });
-      const data = await authService.register(patientData);
+      // Handle optional fields
+      if (formData.age) {
+        const currentYear = new Date().getFullYear();
+        const birthYear = currentYear - parseInt(formData.age);
+        // Set to January 1st of the birth year for simplicity
+        patientData.user.dateOfBirth = new Date(birthYear, 0, 1).toISOString();
+        // Also include the age directly
+        patientData.user.age = parseInt(formData.age);
+      }
+
+      if (formData.bloodGroup) {
+        patientData.bloodGroup = formData.bloodGroup;
+      }
       
-      if (!data.success) {
-        throw new Error(data.message || "Registration failed. Please try again.");
+      if (formData.height) {
+        patientData.height = parseInt(formData.height);
+      }
+      
+      if (formData.weight) {
+        patientData.weight = parseInt(formData.weight);
+      }
+
+      // Include empty address object to satisfy schema requirements
+      patientData.user.address = {
+        street: "",
+        city: "",
+        state: "",
+        zipCode: "",
+        country: ""
+      };
+
+      console.log("Registering patient:", { 
+        ...patientData, 
+        user: {
+          ...patientData.user,
+          password: "********"  // Hide password in logs
+        }
+      });
+      
+      // Try to directly use the patient-specific registration endpoint
+      const response = await authService.registerPatient(patientData);
+      
+      // If that fails, fall back to the standard registration endpoint
+      if (!response.success) {
+        console.log("Patient-specific registration failed, trying standard registration");
+        const standardResponse = await authService.register(patientData);
+        
+        if (!standardResponse.success) {
+          throw new Error(standardResponse.message || "Registration failed. Please try again.");
+        }
+        
+        console.log("Standard registration successful");
+      } else {
+        console.log("Patient-specific registration successful");
       }
       
       toast.success("Registration successful! Please login with your credentials.");
@@ -131,6 +193,7 @@ const SignUp = () => {
         } 
       });
     } catch (error) {
+      console.error("Registration error:", error);
       setError(error.response?.data?.message || error.message || "Registration failed. Please try again.");
       toast.error(error.response?.data?.message || error.message || "Registration failed. Please try again.");
     } finally {

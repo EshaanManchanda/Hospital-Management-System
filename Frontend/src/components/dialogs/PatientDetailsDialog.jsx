@@ -4,7 +4,8 @@ import {
   DialogContent, 
   DialogHeader, 
   DialogTitle, 
-  DialogFooter 
+  DialogFooter,
+  DialogDescription
 } from "@/components/admin/ui/dialog";
 import { Button } from "@/components/admin/ui/button";
 import { ScrollArea } from "@/components/admin/ui/scroll-area";
@@ -21,9 +22,20 @@ import {
   CalendarClock, 
   CreditCard,
   Edit, 
-  Trash
+  Trash,
+  UserRound,
+  AlertTriangle,
+  Contact,
+  DollarSign,
+  CalendarDays,
+  SquareStack,
+  Shield,
+  ClipboardList,
+  Activity,
+  User2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/admin/ui/avatar";
 
 // Default image to use when no patient image is available
 const DEFAULT_PATIENT_IMAGE = "/assets/default-patient.jpg";
@@ -31,16 +43,32 @@ const DEFAULT_PATIENT_IMAGE = "/assets/default-patient.jpg";
 const PatientDetailsDialog = ({ open, onOpenChange, patient, onEdit, onDelete }) => {
   if (!patient) return null;
 
+  // Helper function to calculate age
+  const calculateAge = (dateOfBirth) => {
+    if (!dateOfBirth) return "N/A";
+    
+    const dob = new Date(dateOfBirth);
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const monthDiff = today.getMonth() - dob.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+      age--;
+    }
+    
+    return `${age} years`;
+  };
+
   // Helper function to render safe items as a list
-  const renderList = (items, emptyMessage) => {
+  const renderList = (items, emptyMessage = "None") => {
     if (!items || !Array.isArray(items) || items.length === 0) {
-      return <p className="text-sm text-muted-foreground italic">{emptyMessage}</p>;
+      return <p className="text-gray-500 italic">{emptyMessage}</p>;
     }
     
     return (
-      <ul className="list-disc pl-5 space-y-1">
+      <ul className="space-y-1 list-disc list-inside text-sm">
         {items.map((item, index) => (
-          <li key={index}>{item}</li>
+          <li key={index}>{typeof item === 'string' ? item : JSON.stringify(item)}</li>
         ))}
       </ul>
     );
@@ -67,11 +95,20 @@ const PatientDetailsDialog = ({ open, onOpenChange, patient, onEdit, onDelete })
     return patient.user?.profileImage || patient.user?.picture || DEFAULT_PATIENT_IMAGE;
   };
 
+  // Helper to get patient status
+  const getPatientStatus = () => {
+    if (patient.status) return patient.status;
+    return patient.isActive ? "Active" : "Inactive";
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>Patient Profile</DialogTitle>
+          <DialogDescription>
+            View detailed patient information and medical history
+          </DialogDescription>
         </DialogHeader>
 
         <ScrollArea className="flex-grow pr-4">
@@ -97,19 +134,19 @@ const PatientDetailsDialog = ({ open, onOpenChange, patient, onEdit, onDelete })
                 <Badge 
                   className={cn(
                     "w-full flex justify-center py-1",
-                    patient.status === "Active" 
+                    getPatientStatus() === "Active" 
                       ? "bg-green-100 text-green-800 hover:bg-green-100" 
-                      : patient.status === "Inactive"
+                      : getPatientStatus() === "Inactive"
                       ? "bg-amber-100 text-amber-800 hover:bg-amber-100"
                       : "bg-red-100 text-red-800 hover:bg-red-100"
                   )}
                 >
-                  {patient.status || "Unknown Status"}
+                  {getPatientStatus()}
                 </Badge>
                 
                 <div className="flex items-center space-x-2">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">Age: {getPatientAge()}</span>
+                  <span className="text-sm">Age: {calculateAge(patient.user?.dateOfBirth)}</span>
                 </div>
                 
                 <div className="flex items-center space-x-2">
@@ -176,13 +213,22 @@ const PatientDetailsDialog = ({ open, onOpenChange, patient, onEdit, onDelete })
             <div className="md:col-span-2">
               <Tabs defaultValue="medical">
                 <TabsList className="grid grid-cols-3 mb-4">
-                  <TabsTrigger value="medical">Medical Info</TabsTrigger>
-                  <TabsTrigger value="appointments">Appointments</TabsTrigger>
-                  <TabsTrigger value="billing">Billing</TabsTrigger>
+                  <TabsTrigger value="medical" className="flex items-center gap-1">
+                    <HeartPulse className="h-4 w-4" />
+                    <span className="hidden sm:inline">Medical Info</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="appointments" className="flex items-center gap-1">
+                    <CalendarDays className="h-4 w-4" />
+                    <span className="hidden sm:inline">Appointments</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="billing" className="flex items-center gap-1">
+                    <DollarSign className="h-4 w-4" />
+                    <span className="hidden sm:inline">Billing</span>
+                  </TabsTrigger>
                 </TabsList>
                 
                 {/* Medical Info Tab */}
-                <TabsContent value="medical" className="space-y-4">
+                <TabsContent value="medical" className="space-y-6">
                   <div>
                     <h4 className="font-medium mb-1">Blood Type</h4>
                     <p className="text-sm">{patient.bloodType || "Not recorded"}</p>
@@ -198,45 +244,50 @@ const PatientDetailsDialog = ({ open, onOpenChange, patient, onEdit, onDelete })
                     <p className="text-sm">{patient.weight ? `${patient.weight} kg` : "Not recorded"}</p>
                   </div>
                   
-                  <div>
-                    <h4 className="font-medium mb-1 flex items-center">
-                      <Pill className="h-4 w-4 mr-1 text-muted-foreground" />
+                  <div className="space-y-2">
+                    <h4 className="font-medium mb-1 flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-amber-500" />
                       Allergies
                     </h4>
                     {renderList(patient.allergies, "No allergies recorded")}
                   </div>
                   
-                  <div>
-                    <h4 className="font-medium mb-1 flex items-center">
-                      <HeartPulse className="h-4 w-4 mr-1 text-muted-foreground" />
+                  <div className="space-y-2">
+                    <h4 className="font-medium mb-1 flex items-center gap-2">
+                      <Activity className="h-4 w-4 text-red-500" />
                       Chronic Conditions
                     </h4>
-                    {renderList(patient.chronicConditions, "No chronic conditions recorded")}
+                    {renderList(patient.conditions || patient.chronicDiseases, "No chronic conditions recorded")}
                   </div>
                   
-                  <div>
-                    <h4 className="font-medium mb-1 flex items-center">
-                      <Pill className="h-4 w-4 mr-1 text-muted-foreground" />
+                  <div className="space-y-2">
+                    <h4 className="font-medium mb-1 flex items-center gap-2">
+                      <ClipboardList className="h-4 w-4 text-blue-500" />
                       Current Medications
                     </h4>
                     {renderList(patient.medications, "No medications recorded")}
                   </div>
                   
-                  <div>
+                  <div className="space-y-2">
                     <h4 className="font-medium mb-1">Past Surgeries</h4>
                     {renderList(patient.surgeries, "No surgeries recorded")}
                   </div>
                   
                   {patient.notes && (
-                    <div>
-                      <h4 className="font-medium mb-1">Medical Notes</h4>
-                      <p className="text-sm text-muted-foreground">{patient.notes}</p>
+                    <div className="space-y-2">
+                      <h4 className="font-medium mb-1 flex items-center gap-2">
+                        <ClipboardList className="h-4 w-4 text-gray-500" />
+                        Medical Notes
+                      </h4>
+                      <p className="text-sm whitespace-pre-line bg-gray-50 p-3 rounded-md">
+                        {patient.notes}
+                      </p>
                     </div>
                   )}
                 </TabsContent>
                 
                 {/* Appointments Tab */}
-                <TabsContent value="appointments" className="space-y-4">
+                <TabsContent value="appointments" className="space-y-6">
                   <div className="flex items-center justify-between">
                     <h4 className="font-medium">Recent Appointments</h4>
                     <Button variant="outline" size="sm" className="text-xs h-8">
@@ -248,40 +299,51 @@ const PatientDetailsDialog = ({ open, onOpenChange, patient, onEdit, onDelete })
                   {patient.appointments && Array.isArray(patient.appointments) && patient.appointments.length > 0 ? (
                     <div className="space-y-3">
                       {patient.appointments.map((appointment, index) => (
-                        <div key={index} className="border rounded-md p-3 space-y-2">
+                        <div key={index} className="bg-gray-50 p-3 rounded-md space-y-2">
                           <div className="flex justify-between items-start">
-                            <div>
-                              <p className="font-medium">{appointment.type || "Consultation"}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {new Date(appointment.date).toLocaleDateString()} at {appointment.time}
-                              </p>
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-4 w-4 text-blue-500" />
+                              <span className="font-medium text-sm">
+                                {new Date(appointment.date).toLocaleDateString()}
+                              </span>
+                              <span className="text-sm text-gray-500">
+                                {appointment.time}
+                              </span>
                             </div>
-                            <Badge className={
+                            <Badge className={cn(
                               appointment.status === "Completed" 
                                 ? "bg-green-100 text-green-800" 
                                 : appointment.status === "Scheduled" 
-                                ? "bg-blue-100 text-blue-800"
-                                : appointment.status === "Cancelled"
-                                ? "bg-red-100 text-red-800"
-                                : "bg-amber-100 text-amber-800"
-                            }>
+                                  ? "bg-blue-100 text-blue-800"
+                                  : appointment.status === "Cancelled"
+                                    ? "bg-red-100 text-red-800"
+                                    : "bg-amber-100 text-amber-800"
+                            )}>
                               {appointment.status}
                             </Badge>
                           </div>
-                          <div className="text-sm">
-                            <p>Doctor: {appointment.doctor?.name || "Not assigned"}</p>
-                            {appointment.notes && <p className="text-muted-foreground">{appointment.notes}</p>}
+                          <div className="pl-6 text-sm">
+                            <p className="font-medium">{appointment.type || "General Checkup"}</p>
+                            {appointment.doctor && (
+                              <p className="text-gray-600">
+                                Dr. {appointment.doctor.user?.name || "Unknown"}
+                                {appointment.doctor.specialization && ` (${appointment.doctor.specialization})`}
+                              </p>
+                            )}
+                            {appointment.description && (
+                              <p className="text-gray-600 mt-1">{appointment.description}</p>
+                            )}
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground italic">No appointment history found</p>
+                    <p className="text-gray-500 italic">No appointment history found</p>
                   )}
                 </TabsContent>
                 
                 {/* Billing Tab */}
-                <TabsContent value="billing" className="space-y-4">
+                <TabsContent value="billing" className="space-y-6">
                   <div className="flex items-center justify-between">
                     <h4 className="font-medium">Billing History</h4>
                     <Button variant="outline" size="sm" className="text-xs h-8">
@@ -292,41 +354,46 @@ const PatientDetailsDialog = ({ open, onOpenChange, patient, onEdit, onDelete })
                   
                   {patient.billingHistory && Array.isArray(patient.billingHistory) && patient.billingHistory.length > 0 ? (
                     <div className="space-y-3">
-                      {patient.billingHistory.map((billing, index) => (
-                        <div key={index} className="border rounded-md p-3 space-y-2">
+                      {patient.billingHistory.map((bill, index) => (
+                        <div key={index} className="bg-gray-50 p-3 rounded-md space-y-2">
                           <div className="flex justify-between items-start">
-                            <div>
-                              <p className="font-medium">Invoice #{billing.invoiceNumber}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {new Date(billing.date).toLocaleDateString()}
-                              </p>
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-4 w-4 text-blue-500" />
+                              <span className="font-medium text-sm">
+                                {new Date(bill.date).toLocaleDateString()}
+                              </span>
+                              <span className="text-sm text-gray-500">
+                                Invoice #{bill.invoiceNumber || index + 1}
+                              </span>
                             </div>
-                            <div className="text-right">
-                              <p className="font-medium">${billing.amount.toFixed(2)}</p>
-                              <Badge className={
-                                billing.status === "Paid" 
-                                  ? "bg-green-100 text-green-800" 
-                                  : billing.status === "Pending" 
-                                  ? "bg-amber-100 text-amber-800" 
+                            <Badge className={cn(
+                              bill.status === "Paid" 
+                                ? "bg-green-100 text-green-800" 
+                                : bill.status === "Pending" 
+                                  ? "bg-amber-100 text-amber-800"
                                   : "bg-red-100 text-red-800"
-                              }>
-                                {billing.status}
-                              </Badge>
-                            </div>
+                            )}>
+                              {bill.status}
+                            </Badge>
                           </div>
-                          <div className="text-sm">
-                            <p>Service: {billing.serviceDescription}</p>
-                            {billing.paymentMethod && (
-                              <p className="text-muted-foreground">
-                                Payment Method: {billing.paymentMethod}
-                              </p>
+                          <div className="pl-6 text-sm">
+                            <p className="font-medium">{bill.description || "Medical Service"}</p>
+                            <div className="flex justify-between mt-1">
+                              <span className="text-gray-600">Amount:</span>
+                              <span className="font-medium">${bill.amount.toFixed(2)}</span>
+                            </div>
+                            {bill.insurance && (
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">Insurance Coverage:</span>
+                                <span className="font-medium">${bill.insurance.coverage.toFixed(2)}</span>
+                              </div>
                             )}
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground italic">No billing history found</p>
+                    <p className="text-gray-500 italic">No billing history found</p>
                   )}
                 </TabsContent>
               </Tabs>
@@ -344,7 +411,10 @@ const PatientDetailsDialog = ({ open, onOpenChange, patient, onEdit, onDelete })
           <div className="flex gap-2">
             <Button 
               variant="outline" 
-              onClick={onEdit}
+              onClick={() => {
+                onOpenChange(false);
+                onEdit(patient);
+              }}
               className="flex items-center"
             >
               <Edit className="h-4 w-4 mr-2" />
@@ -352,7 +422,10 @@ const PatientDetailsDialog = ({ open, onOpenChange, patient, onEdit, onDelete })
             </Button>
             <Button 
               variant="destructive" 
-              onClick={() => onDelete(patient)}
+              onClick={() => {
+                onOpenChange(false);
+                onDelete(patient);
+              }}
               className="flex items-center"
             >
               <Trash className="h-4 w-4 mr-2" />

@@ -107,21 +107,25 @@ const DoctorFormDialog = ({ open, onOpenChange, doctor, mode = 'add', onSave }) 
   // Update form when doctor data changes
   useEffect(() => {
     if (doctor && mode === 'edit') {
+      console.log('Doctor data for form:', doctor);
+      // Handle both nested and flattened data structures
       const formattedDoctor = {
         user: {
-          name: doctor.user?.name || "",
-          email: doctor.user?.email || "",
-          mobile: doctor.user?.mobile || "",
-          gender: doctor.user?.gender || "male",
+          // If data is flattened (API directly returns name, email, etc.)
+          name: doctor.name || doctor.user?.name || "",
+          email: doctor.email || doctor.user?.email || "",
+          mobile: doctor.mobile || doctor.user?.mobile || "",
+          gender: doctor.gender || doctor.user?.gender || "male",
           address: {
-            street: doctor.user?.address?.street || "",
-            city: doctor.user?.address?.city || "",
-            state: doctor.user?.address?.state || "",
-            zipCode: doctor.user?.address?.zipCode || "",
-            country: doctor.user?.address?.country || ""
+            // Check if address exists directly or in user object
+            street: doctor.address?.street || doctor.user?.address?.street || "",
+            city: doctor.address?.city || doctor.user?.address?.city || "",
+            state: doctor.address?.state || doctor.user?.address?.state || "",
+            zipCode: doctor.address?.zipCode || doctor.user?.address?.zipCode || "",
+            country: doctor.address?.country || doctor.user?.address?.country || ""
           }
         },
-        specialization: doctor.specialization || "",
+        specialization: doctor.specialization || doctor.specialty || "",
         experience: doctor.experience || 0,
         fee: doctor.fee || 0,
         qualifications: doctor.qualifications || [],
@@ -134,6 +138,7 @@ const DoctorFormDialog = ({ open, onOpenChange, doctor, mode = 'add', onSave }) 
         isAvailable: doctor.isAvailable !== undefined ? doctor.isAvailable : true
       };
 
+      console.log('Formatted doctor data for form:', formattedDoctor);
       // Reset form with doctor data
       form.reset(formattedDoctor);
       setQualifications(formattedDoctor.qualifications || []);
@@ -167,13 +172,91 @@ const DoctorFormDialog = ({ open, onOpenChange, doctor, mode = 'add', onSave }) 
       // Make sure qualifications are included
       data.qualifications = qualifications;
       
+      // Format data to match API expectations for the specific mode (add or edit)
+      let formattedData;
+      
+      if (mode === 'edit' && doctor) {
+        // For edit mode, only include the fields that are actually changing
+        // This reduces the chances of validation errors or conflicts
+        formattedData = {
+          // Basic information
+          name: data.user.name,
+          email: data.user.email,
+          mobile: data.user.mobile,
+          gender: data.user.gender,
+          
+          // Professional details
+          specialization: data.specialization,
+          experience: data.experience,
+          fee: data.fee,
+          about: data.about,
+          isAvailable: data.isAvailable,
+          
+          // Only include non-empty arrays
+          qualifications: qualifications.length > 0 ? qualifications : undefined,
+          workingDays: data.workingDays.length > 0 ? data.workingDays : undefined,
+          
+          // Only include address if there's at least one address field
+          address: Object.values(data.user.address).some(val => val && val.trim() !== '') 
+            ? {
+                street: data.user.address.street || '',
+                city: data.user.address.city || '',
+                state: data.user.address.state || '',
+                zipCode: data.user.address.zipCode || '',
+                country: data.user.address.country || ''
+              }
+            : undefined,
+            
+          // Working hours
+          workingHours: {
+            start: data.workingHours.start || '09:00',
+            end: data.workingHours.end || '17:00'
+          }
+        };
+      } else {
+        // For add mode, include all required fields
+        formattedData = {
+          // User data flattened at root level
+          name: data.user.name,
+          email: data.user.email,
+          mobile: data.user.mobile,
+          gender: data.user.gender,
+          password: "doctor123", // Default password for new doctors
+          
+          // Address as a nested object if any address field is provided
+          address: Object.values(data.user.address).some(val => val && val.trim() !== '') 
+            ? data.user.address
+            : undefined,
+          
+          // Doctor specific fields
+          specialization: data.specialization,
+          experience: data.experience,
+          fee: data.fee,
+          qualifications: qualifications,
+          workingDays: data.workingDays,
+          workingHours: data.workingHours,
+          about: data.about,
+          isAvailable: data.isAvailable
+        };
+      }
+      
+      console.log(`${mode === 'edit' ? 'Updating' : 'Creating'} doctor with data:`, formattedData);
+      
       // Call the save function passed from parent
-      await onSave(data);
+      await onSave(formattedData);
       
       // Close dialog on success
       onOpenChange(false);
     } catch (error) {
       console.error("Error saving doctor:", error);
+      
+      // Show a toast error message to the user
+      // (You'll need to import toast if you want to add this functionality)
+      // toast({
+      //   title: "Error",
+      //   description: error.message || "Failed to save doctor information",
+      //   variant: "destructive",
+      // });
     } finally {
       setIsLoading(false);
     }

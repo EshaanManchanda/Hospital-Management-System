@@ -7,7 +7,8 @@ import {
   DialogContent, 
   DialogHeader, 
   DialogTitle, 
-  DialogFooter 
+  DialogFooter,
+  DialogDescription
 } from "@/components/admin/ui/dialog";
 import {
   Form,
@@ -230,6 +231,9 @@ const PatientFormDialog = ({ open, onOpenChange, patient, mode = "add", onSave }
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>{mode === "edit" ? "Edit Patient" : "Add New Patient"}</DialogTitle>
+          <DialogDescription>
+            {mode === "edit" ? "Edit the details of the patient" : "Add a new patient to the system"}
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>

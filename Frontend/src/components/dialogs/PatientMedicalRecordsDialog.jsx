@@ -4,7 +4,8 @@ import {
   DialogContent, 
   DialogHeader, 
   DialogTitle, 
-  DialogFooter 
+  DialogFooter,
+  DialogDescription
 } from "@/components/admin/ui/dialog";
 import { Button } from "@/components/admin/ui/button";
 import { ScrollArea } from "@/components/admin/ui/scroll-area";
@@ -111,6 +112,9 @@ const PatientMedicalRecordsDialog = ({ open, onOpenChange, patient, onSave }) =>
             <FileText className="h-5 w-5 mr-2" />
             Medical Records for {patient.user?.name || "Unknown Patient"}
           </DialogTitle>
+          <DialogDescription>
+            View and manage detailed medical information for this patient
+          </DialogDescription>
         </DialogHeader>
 
         <ScrollArea className="flex-grow pr-4">

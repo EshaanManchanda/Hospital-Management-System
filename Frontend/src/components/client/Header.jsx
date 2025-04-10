@@ -47,14 +47,25 @@ const Header = () => {
     }
 
     const handleLogout = () => {
-        authService.logout();
+        authService.logout().then(() => {
+            // Navigate to the login page after logout
+            window.location.href = '/login';
+        });
+    };
+
+    const handleMobileLogout = () => {
+        setIsMenuOpen(false);
+        authService.logout().then(() => {
+            // Navigate to the login page after logout
+            window.location.href = '/login';
+        });
     };
 
     const navItems = [
         { title: 'Home', path: '/', icon: <FaRegHospital className="w-5 h-5" /> },
         { title: 'Doctors', path: '/doctors', icon: <FaUserMd className="w-5 h-5" /> },
         { title: 'About Us', path: '/about-us', icon: <FaInfoCircle className="w-5 h-5" /> },
-        { title: 'Contact', path: '/contact-us', icon: <FaEnvelope className="w-5 h-5" /> }
+        { title: 'Contact', path: '/contact', icon: <FaEnvelope className="w-5 h-5" /> }
     ];
 
     return (
@@ -260,10 +271,7 @@ const Header = () => {
                                     </>
                                 ) : (
                                     <button 
-                                        onClick={() => {
-                                            authService.logout();
-                                            setIsMenuOpen(false);
-                                        }} 
+                                        onClick={handleMobileLogout} 
                                         className="flex items-center justify-center w-full p-3 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors font-medium"
                                     >
                                         <LogOut className="w-5 h-5 mr-2" />

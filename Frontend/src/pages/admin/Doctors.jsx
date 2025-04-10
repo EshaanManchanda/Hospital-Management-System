@@ -9,86 +9,48 @@ import { Button } from "@/components/admin/ui/button";
 import { Input } from "@/components/admin/ui/input";
 import { 
   Card, 
-  CardContent 
+  CardContent,
+  CardFooter
 } from "@/components/admin/ui/card";
 import { Badge } from "@/components/admin/ui/badge";
-import { Search, Filter, ChevronDown, Plus, Edit, Eye } from "lucide-react";
+import { Search, Filter, ChevronDown, Plus, Edit, Eye, User, Link, XCircle, Mail, Phone, MoreHorizontal } from "lucide-react";
 import { useToast } from "@/components/admin/ui/use-toast";
 import { Skeleton } from "@/components/admin/ui/skeleton";
 import DoctorFormDialog from "@/components/dialogs/DoctorFormDialog";
 import DoctorDetailsDialog from "@/components/dialogs/DoctorDetailsDialog";
 import DoctorDeleteDialog from "@/components/dialogs/DoctorDeleteDialog";
-import axios from "axios";
+import doctorService from "@/services/doctorService";
 import { cn } from "@/lib/utils";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/admin/ui/avatar";
+import { ScrollArea } from "@/components/admin/ui/scroll-area";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/admin/ui/select";
+import { 
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogCancel,
+  AlertDialogAction
+} from "@/components/admin/ui/alert-dialog";
+import { 
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/components/admin/ui/table";
 
-// Make sure API URL is correct with the /api path
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 // Default doctor image to use when no image is available
 const DEFAULT_DOCTOR_IMAGE = "/assets/default-doctor.jpg";
-
-// Create sample mock data for development until the API is available
-const MOCK_DOCTORS = [
-  {
-    _id: "65c8f11a8e85a72b7cf89432",
-    user: {
-      _id: "65c8f11a8e85a72b7cf89430",
-      name: "Dr. Jane Smith",
-      email: "jane.smith@hospital.com",
-      profileImage: ""
-    },
-    specialization: "Cardiology",
-    experience: 8,
-    fee: 150,
-    patients: [],
-    qualifications: [
-      {
-        degree: "MD",
-        institution: "Harvard Medical School",
-        year: 2015
-      }
-    ],
-    about: "Specialist in cardiovascular medicine with focus on preventive care",
-    workingHours: {
-      start: "09:00",
-      end: "17:00"
-    },
-    workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-    appointments: [],
-    ratings: [],
-    averageRating: 0,
-    isAvailable: true
-  },
-  {
-    _id: "65c8f11a8e85a72b7cf89433",
-    user: {
-      _id: "65c8f11a8e85a72b7cf89431",
-      name: "Dr. John Williams",
-      email: "john.williams@hospital.com",
-      profileImage: ""
-    },
-    specialization: "Neurology",
-    experience: 12,
-    fee: 200,
-    patients: [],
-    qualifications: [
-      {
-        degree: "MD",
-        institution: "Johns Hopkins University",
-        year: 2010
-      }
-    ],
-    about: "Experienced neurologist specializing in advanced diagnostic procedures",
-    workingHours: {
-      start: "08:00",
-      end: "16:00"
-    },
-    workingDays: ["Monday", "Tuesday", "Thursday", "Friday"],
-    appointments: [],
-    ratings: [],
-    averageRating: 0,
-    isAvailable: true
-  }
-];
 
 const Doctors = () => {
   const { toast } = useToast();
@@ -112,6 +74,9 @@ const Doctors = () => {
   const [doctorsPerPage] = useState(6);
   const [totalPages, setTotalPages] = useState(1);
 
+  // View mode state
+  const [viewMode, setViewMode] = useState("grid");
+
   // Fetch doctors data
   useEffect(() => {
     fetchDoctors();
@@ -131,65 +96,65 @@ const Doctors = () => {
   const fetchDoctors = async () => {
     setIsLoading(true);
     try {
-      // Complete URL including /api path
-      const response = await axios.get(`http://localhost:5000/api/doctors/all`);
-      
-      if (response.data && response.data.success) {
-        const doctorsData = response.data.data || [];
-        setDoctors(doctorsData);
-        setUseMockData(false);
-        
-        // Extract unique specialties for the filter dropdown
-        const uniqueSpecialties = [...new Set(doctorsData.map(doctor => doctor.specialization))];
-        setSpecialties(["All Specializations", ...uniqueSpecialties]);
+      const response = await doctorService.getAllDoctors();
+      if (response.success) {
+        setDoctors(response.doctors);
+        // Extract unique specialties for filtering
+        const uniqueSpecialties = [...new Set(response.doctors.map(doctor => doctor.specialization))];
+        setSpecialties(uniqueSpecialties);
+        toast.success('Doctors loaded successfully');
       } else {
-        // If API returns error response, fallback to mock data
-        fallbackToMockData();
+        toast.error('Failed to load doctors');
       }
     } catch (error) {
-      console.error("Error fetching doctors:", error);
-      // If API call fails (404, 500, etc.), fallback to mock data
-      fallbackToMockData();
+      console.error('Error fetching doctors:', error);
+      toast.error('Error loading doctors: ' + (error.message || 'Unknown error'));
     } finally {
       setIsLoading(false);
     }
   };
   
-  const fallbackToMockData = () => {
-    toast({
-      title: "Using development data",
-      description: "Could not connect to API, using sample data instead",
-      variant: "warning",
-    });
-    
-    setUseMockData(true);
-    setDoctors(MOCK_DOCTORS);
-    
-    // Extract unique specialties for the filter dropdown from mock data
-    const uniqueSpecialties = [...new Set(MOCK_DOCTORS.map(doctor => doctor.specialization))];
-    setSpecialties(["All Specializations", ...uniqueSpecialties]);
-  };
-
   const applyFiltersAndSearch = () => {
-    let results = [...doctors];
+    let result = [...doctors];
     
-    // Apply specialty filter
-    if (selectedSpecialty !== "All Specializations") {
-      results = results.filter(doctor => doctor.specialization === selectedSpecialty);
-    }
-    
-    // Apply search term
+    // Apply search
     if (searchTerm) {
-      const lowercasedSearch = searchTerm.toLowerCase();
-      results = results.filter(doctor => 
-        (doctor.user?.name || "").toLowerCase().includes(lowercasedSearch) ||
-        (doctor.specialization || "").toLowerCase().includes(lowercasedSearch) ||
-        (doctor._id || "").toLowerCase().includes(lowercasedSearch) ||
-        (doctor.user?.email || "").toLowerCase().includes(lowercasedSearch)
+      const searchLower = searchTerm.toLowerCase();
+      result = result.filter(doctor => 
+        (doctor.user?.firstName + ' ' + doctor.user?.lastName)?.toLowerCase().includes(searchLower) ||
+        doctor.specialization?.toLowerCase().includes(searchLower) ||
+        doctor.licenseNumber?.toLowerCase().includes(searchLower)
       );
     }
     
-    setFilteredDoctors(results);
+    // Apply specialty filter
+    if (selectedSpecialty && selectedSpecialty !== "All Specializations") {
+      result = result.filter(doctor => doctor.specialization === selectedSpecialty);
+    }
+    
+    // Apply status filter
+    if (selectedSpecialty === "Active") {
+      result = result.filter(doctor => doctor.status === true);
+    } else if (selectedSpecialty === "Not Active") {
+      result = result.filter(doctor => doctor.status === false);
+    }
+    
+    // Apply availability filter
+    if (selectedSpecialty === "Available") {
+      result = result.filter(doctor => doctor.isAvailable === true);
+    } else if (selectedSpecialty === "Not Available") {
+      result = result.filter(doctor => doctor.isAvailable === false);
+    }
+    
+    setFilteredDoctors(result);
+    
+    // Update pagination
+    setTotalPages(Math.ceil(result.length / doctorsPerPage));
+    if (currentPage > Math.ceil(result.length / doctorsPerPage)) {
+      setCurrentPage(1);
+    }
+    
+    return result;
   };
 
   const handleFilterChange = (specialty) => {
@@ -220,94 +185,51 @@ const Doctors = () => {
     setShowDeleteDialog(true);
   };
 
-  const handleSaveDoctor = async (doctorData) => {
+  const handleSaveDoctor = async (formData) => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      
-      if (useMockData) {
-        // If using mock data, just simulate a successful API response
-        await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API delay
+      if (selectedDoctor && selectedDoctor._id) {
+        // Update existing doctor
+        const response = await doctorService.updateDoctor(selectedDoctor._id, formData);
         
-        if (selectedDoctor && showEditDialog) {
-          const updatedDoctors = doctors.map(doc =>
-            doc._id === selectedDoctor._id ? { ...doc, ...doctorData } : doc
-          );
-          setDoctors(updatedDoctors);
-          
+        if (response.success) {
           toast({
-            title: "Success",
-            description: "Doctor information updated successfully (mock).",
+            title: "Doctor Updated",
+            description: "Doctor information has been updated successfully.",
           });
-        } else {
-          // Add new doctor to mock data
-          const newDoctor = {
-            _id: `mock-${Date.now()}`,
-            ...doctorData,
-            isAvailable: true,
-            patients: [],
-            appointments: []
-          };
-          setDoctors([...doctors, newDoctor]);
-          
-          toast({
-            title: "Success",
-            description: "New doctor added successfully (mock).",
-          });
-        }
-        
-        setShowEditDialog(false);
-        setShowAddDialog(false);
-        return;
-      }
-      
-      // Not using mock data, proceed with real API calls
-      if (selectedDoctor && showEditDialog) {
-        // Edit existing doctor - make sure we use the correct API URL 
-        const response = await axios.put(`${API_URL}/doctors/${selectedDoctor._id}`, doctorData);
-        
-        if (response.data && response.data.success) {
-          // Refresh doctor list to get updated data
-          await fetchDoctors();
-          
-          toast({
-            title: "Success",
-            description: "Doctor information updated successfully.",
-          });
+          fetchDoctors();
         } else {
           toast({
-            title: "Error",
-            description: response.data?.message || "Failed to update doctor information",
             variant: "destructive",
+            title: "Update Failed",
+            description: response.message || "Failed to update doctor information.",
           });
         }
-        setShowEditDialog(false);
       } else {
-        // Add new doctor - make sure we use the correct API URL
-        const response = await axios.post(`${API_URL}/doctors`, doctorData);
+        // Add new doctor
+        const response = await doctorService.createDoctor(formData);
         
-        if (response.data && response.data.success) {
-          // Refresh doctor list to get new data
-          await fetchDoctors();
-          
+        if (response.success) {
           toast({
-            title: "Success",
-            description: "New doctor added successfully.",
+            title: "Doctor Added",
+            description: "New doctor has been added successfully.",
           });
+          fetchDoctors();
         } else {
           toast({
-            title: "Error",
-            description: response.data?.message || "Failed to add new doctor",
             variant: "destructive",
+            title: "Addition Failed",
+            description: response.message || "Failed to add new doctor.",
           });
         }
-        setShowAddDialog(false);
       }
+      handleCloseAllDialogs();
     } catch (error) {
       console.error("Error saving doctor:", error);
       toast({
-        title: "Error",
-        description: error.response?.data?.message || "An error occurred while saving doctor information.",
         variant: "destructive",
+        title: "Operation Failed",
+        description: "An unexpected error occurred. Please try again.",
       });
     } finally {
       setIsLoading(false);
@@ -336,21 +258,21 @@ const Doctors = () => {
           return;
         }
         
-        // Not using mock data, proceed with real API call
-        const response = await axios.delete(`${API_URL}/doctors/${selectedDoctor._id}`);
+        // Not using mock data, proceed with real API call via service
+        const response = await doctorService.deleteDoctor(selectedDoctor._id);
         
-        if (response.data && response.data.success) {
+        if (response && response.success) {
           // Refresh doctor list after delete
           await fetchDoctors();
           
           toast({
             title: "Success",
-            description: "Doctor removed successfully.",
+            description: response.message || "Doctor removed successfully.",
           });
         } else {
           toast({
             title: "Error",
-            description: response.data?.message || "Failed to delete doctor",
+            description: "Failed to delete doctor",
             variant: "destructive",
           });
         }
@@ -358,7 +280,7 @@ const Doctors = () => {
         console.error("Error deleting doctor:", error);
         toast({
           title: "Error",
-          description: error.response?.data?.message || "An error occurred while deleting the doctor.",
+          description: error.message || "An error occurred while deleting the doctor.",
           variant: "destructive",
         });
       } finally {
@@ -375,7 +297,8 @@ const Doctors = () => {
 
   // Helper to get doctor name from associated user
   const getDoctorName = (doctor) => {
-    return doctor.user?.name || "Unknown Doctor";
+    // Check for direct name property first, then check for nested user property
+    return doctor.name || (doctor.user?.name) || "Unknown Doctor";
   };
 
   // Helper to get doctor availability status
@@ -385,218 +308,457 @@ const Doctors = () => {
 
   // Helper to get doctor's image
   const getDoctorImage = (doctor) => {
-    return doctor.user?.profileImage || doctor.user?.picture || DEFAULT_DOCTOR_IMAGE;
+    return doctor.profileImage || doctor.user?.profileImage || doctor.user?.picture || DEFAULT_DOCTOR_IMAGE;
   };
 
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-800">Doctors</h1>
-          <p className="text-gray-600">
-            Manage hospital doctors and specialists
-            {useMockData && <span className="ml-2 text-amber-600 text-sm font-medium">(Using sample data)</span>}
-          </p>
-        </div>
-        
-        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search doctors..."
-              className="pl-10"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="flex items-center gap-2">
-                <Filter className="h-4 w-4" />
-                <span className="hidden sm:inline">Filter</span>
-                <ChevronDown className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {specialties.map((specialty) => (
-                <DropdownMenuItem 
-                  key={specialty} 
-                  onClick={() => handleFilterChange(specialty)}
-                  className={selectedSpecialty === specialty ? "bg-slate-100 font-medium" : ""}
-                >
-                  {specialty}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          
-          <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleAddDoctor}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Doctor
-          </Button>
-        </div>
-      </div>
-      
-      {isLoading ? (
-        // Skeleton loader for doctors
+  // Helper to get doctor status
+  const getDoctorStatus = (doctor) => {
+    return doctor.status ? "Active" : "Not Active";
+  };
+
+  // Get paginated doctors
+  const getPaginatedDoctors = () => {
+    const startIndex = (currentPage - 1) * doctorsPerPage;
+    const endIndex = startIndex + doctorsPerPage;
+    return filteredDoctors.slice(startIndex, endIndex);
+  };
+
+  const paginatedDoctors = getPaginatedDoctors();
+
+  // Handle close all dialogs
+  const handleCloseAllDialogs = () => {
+    setShowAddDialog(false);
+    setShowEditDialog(false);
+    setShowViewDialog(false);
+    setShowDeleteDialog(false);
+  };
+
+  // Render doctor grid
+  const renderDoctorGrid = () => {
+    if (isLoading) {
+      return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(6)].map((_, index) => (
+          {Array(6).fill().map((_, index) => (
             <Card key={index} className="overflow-hidden">
-              <CardContent className="p-0">
-                <div className="pt-6 pb-4 px-6 flex flex-col items-center">
-                  <Skeleton className="w-24 h-24 rounded-full mb-4" />
-                  <Skeleton className="h-6 w-40 mb-2" />
-                  <Skeleton className="h-4 w-24 mb-3" />
-                  <Skeleton className="h-4 w-32" />
-                </div>
-                
-                <div className="border-t border-gray-100 flex divide-x">
-                  <Skeleton className="h-12 w-full" />
-                </div>
+              <CardContent className="p-6">
+                <Skeleton className="h-24 w-24 rounded-full mx-auto mb-4" />
+                <Skeleton className="h-6 w-3/4 mx-auto mb-2" />
+                <Skeleton className="h-4 w-1/2 mx-auto mb-4" />
+                <Skeleton className="h-4 w-full mb-2" />
+                <Skeleton className="h-4 w-full mb-2" />
+                <Skeleton className="h-4 w-2/3" />
               </CardContent>
             </Card>
           ))}
         </div>
-      ) : (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {currentDoctors.length > 0 ? (
-              currentDoctors.map((doctor) => (
-                <Card key={doctor._id} className="overflow-hidden hover:shadow-md transition-shadow">
-                  <CardContent className="p-0">
-                    <div className="flex flex-col">
-                      <div className="relative pt-6 pb-4 px-6 flex flex-col items-center">
-                        <div className="absolute top-0 right-0 p-3">
-                          <Badge className={cn(
-                            getDoctorAvailability(doctor) === "Available" 
-                              ? "bg-green-100 text-green-800 hover:bg-green-100" 
-                              : "bg-amber-100 text-amber-800 hover:bg-amber-100"
-                          )}>
-                            {getDoctorAvailability(doctor)}
-                          </Badge>
-                        </div>
-                        
-                        <div className="w-24 h-24 rounded-full bg-gray-200 mb-4 overflow-hidden">
-                          <img 
-                            src={getDoctorImage(doctor)} 
-                            alt={getDoctorName(doctor)} 
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              e.target.onerror = null;
-                              e.target.src = DEFAULT_DOCTOR_IMAGE;
-                            }}
-                          />
-                        </div>
-                        
-                        <h3 className="text-lg font-semibold">{getDoctorName(doctor)}</h3>
-                        <p className="text-gray-500">{doctor.specialization}</p>
-                        
-                        <div className="flex items-center mt-2 text-sm">
-                          <span className="text-gray-600">{doctor.experience} years experience</span>
-                          <span className="mx-2">•</span>
-                          <span className="text-gray-600">{doctor.patients?.length || 0} patients</span>
-                        </div>
-                      </div>
-                      
-                      <div className="border-t border-gray-100 flex divide-x">
-                        <button 
-                          className="flex-1 py-3 text-sm font-medium text-blue-600 hover:bg-gray-50 flex items-center justify-center"
-                          onClick={() => handleViewDoctor(doctor)}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          Profile
-                        </button>
-                        <button 
-                          className="flex-1 py-3 text-sm font-medium text-blue-600 hover:bg-gray-50 flex items-center justify-center"
-                          onClick={() => handleEditDoctor(doctor)}
-                        >
-                          <Edit className="h-4 w-4 mr-1" />
-                          Edit
-                        </button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            ) : (
-              <div className="col-span-3 py-10 text-center">
-                <p className="text-gray-500">
-                  {doctors.length === 0 ? 
-                    "No doctors found. Add your first doctor to get started." : 
-                    "No doctors found matching your search criteria."
-                  }
+      );
+    }
+
+    if (filteredDoctors.length === 0) {
+      return (
+        <div className="text-center py-12">
+          <UserX className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+          <h3 className="text-lg font-medium mb-2">No doctors found</h3>
+          <p className="text-muted-foreground">Try adjusting your search or filters.</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {paginatedDoctors.map((doctor) => (
+          <Card key={doctor._id} className="overflow-hidden hover:shadow-md transition-shadow">
+            <CardContent className="p-0">
+              <div className="p-6 pb-3">
+                <div className="flex justify-between">
+                  <Avatar className="h-16 w-16 mb-4">
+                    {doctor.profileImage ? (
+                      <AvatarImage src={doctor.profileImage} alt={doctor.user?.firstName} />
+                    ) : (
+                      <AvatarFallback className="bg-primary/10 text-primary text-lg">
+                        {doctor.user?.firstName?.charAt(0)}{doctor.user?.lastName?.charAt(0)}
+                      </AvatarFallback>
+                    )}
+                  </Avatar>
+                  <Badge 
+                    variant={doctor.isAvailable ? "default" : "secondary"}
+                    className="h-fit"
+                  >
+                    {doctor.isAvailable ? "Available" : "Unavailable"}
+                  </Badge>
+                </div>
+                
+                <h3 className="font-semibold text-lg">
+                  Dr. {doctor.user?.firstName} {doctor.user?.lastName}
+                </h3>
+                <p className="text-muted-foreground text-sm mb-2">
+                  {doctor.specialization}
+                </p>
+                <p className="text-sm flex items-center gap-2 mb-1">
+                  <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                  {doctor.user?.email || "No email provided"}
+                </p>
+                <p className="text-sm flex items-center gap-2">
+                  <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                  {doctor.user?.phone || "No phone provided"}
                 </p>
               </div>
-            )}
-          </div>
-          
-          {/* Pagination */}
-          {filteredDoctors.length > doctorsPerPage && (
-            <div className="flex items-center justify-center mt-8 space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-              >
-                Previous
-              </Button>
               
-              {[...Array(totalPages)].map((_, index) => (
-                <Button
-                  key={index}
-                  variant={currentPage === index + 1 ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => handlePageChange(index + 1)}
-                  className={currentPage === index + 1 ? "bg-blue-600 hover:bg-blue-700" : ""}
+              <CardFooter className="border-t p-3 bg-muted/30 flex justify-end gap-2">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleViewDoctor(doctor);
+                  }}
                 >
-                  {index + 1}
+                  <Eye className="h-4 w-4 mr-1" />
+                  View
                 </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleEditDoctor(doctor);
+                  }}
+                >
+                  <Pencil className="h-4 w-4 mr-1" />
+                  Edit
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  className="text-destructive hover:text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteDoctor(doctor);
+                  }}
+                >
+                  <Trash className="h-4 w-4 mr-1" />
+                  Delete
+                </Button>
+              </CardFooter>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  };
+
+  // Render doctor table
+  const renderDoctorTable = () => {
+    if (isLoading) {
+      return (
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Doctor</TableHead>
+                <TableHead>Specialization</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Contact</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {Array(5).fill().map((_, index) => (
+                <TableRow key={index}>
+                  <TableCell><Skeleton className="h-6 w-48" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                  <TableCell><Skeleton className="h-8 w-28 ml-auto" /></TableCell>
+                </TableRow>
               ))}
-              
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
-              >
-                Next
-              </Button>
-            </div>
-          )}
-        </>
+            </TableBody>
+          </Table>
+        </div>
+      );
+    }
+
+    if (filteredDoctors.length === 0) {
+      return (
+        <div className="text-center py-12">
+          <UserX className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+          <h3 className="text-lg font-medium mb-2">No doctors found</h3>
+          <p className="text-muted-foreground">Try adjusting your search or filters.</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Doctor</TableHead>
+              <TableHead>Specialization</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Contact</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {paginatedDoctors.map((doctor) => (
+              <TableRow key={doctor._id} className="hover:bg-muted/50">
+                <TableCell>
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-9 w-9">
+                      {doctor.profileImage ? (
+                        <AvatarImage src={doctor.profileImage} alt={doctor.user?.firstName} />
+                      ) : (
+                        <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                          {doctor.user?.firstName?.charAt(0)}{doctor.user?.lastName?.charAt(0)}
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
+                    <div>
+                      <p className="font-medium">Dr. {doctor.user?.firstName} {doctor.user?.lastName}</p>
+                      <p className="text-xs text-muted-foreground">{doctor.licenseNumber || "No license"}</p>
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell>{doctor.specialization}</TableCell>
+                <TableCell>
+                  <Badge variant={doctor.isAvailable ? "default" : "secondary"} className="capitalize">
+                    {doctor.isAvailable ? "Available" : "Unavailable"}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <div className="text-sm">
+                    <p className="flex items-center gap-1">
+                      <Mail className="h-3 w-3" />
+                      {doctor.user?.email || "No email"}
+                    </p>
+                    <p className="flex items-center gap-1 mt-1">
+                      <Phone className="h-3 w-3" />
+                      {doctor.user?.phone || "No phone"}
+                    </p>
+                  </div>
+                </TableCell>
+                <TableCell className="text-right">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <MoreHorizontal className="h-4 w-4" />
+                        <span className="sr-only">Actions</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleViewDoctor(doctor)}>
+                        <Eye className="h-4 w-4 mr-2" />
+                        View Details
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleEditDoctor(doctor)}>
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Edit Doctor
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => handleDeleteDoctor(doctor)}
+                      >
+                        <Trash className="h-4 w-4 mr-2" />
+                        Delete Doctor
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    );
+  };
+
+  return (
+    <div className="container mx-auto p-4">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Doctors</h1>
+        <Button onClick={() => setShowAddDialog(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Add Doctor
+        </Button>
+      </div>
+
+      {/* Search and Filter Bar */}
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6">
+        <div className="col-span-2 relative">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search doctors..."
+            className="pl-8"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        
+        <div className="relative">
+          <Select
+            value={selectedSpecialty === "All Specializations" ? "all" : selectedSpecialty}
+            onValueChange={handleFilterChange}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="All Specialties" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Specialties</SelectItem>
+              {specialties.map((specialty) => (
+                <SelectItem key={specialty} value={specialty}>
+                  {specialty}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div className="relative">
+          <Select
+            value={selectedSpecialty === "Active" ? "active" : selectedSpecialty === "Not Active" ? "inactive" : "all"}
+            onValueChange={(value) => {
+              if (value === "active") {
+                handleFilterChange("Active");
+              } else if (value === "inactive") {
+                handleFilterChange("Not Active");
+              } else {
+                handleFilterChange("All Specializations");
+              }
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="All Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="inactive">Not Active</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div className="relative">
+          <Select
+            value={selectedSpecialty === "Available" ? "available" : selectedSpecialty === "Not Available" ? "unavailable" : "all"}
+            onValueChange={(value) => {
+              if (value === "available") {
+                handleFilterChange("Available");
+              } else if (value === "unavailable") {
+                handleFilterChange("Not Available");
+              } else {
+                handleFilterChange("All Specializations");
+              }
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="All Availability" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Availability</SelectItem>
+              <SelectItem value="available">Available</SelectItem>
+              <SelectItem value="unavailable">Not Available</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div className="relative">
+          <Select
+            value={doctorsPerPage.toString()}
+            onValueChange={(value) => {
+              setCurrentPage(1);
+              setDoctorsPerPage(Number(value));
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Doctors per page" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="6">6</SelectItem>
+              <SelectItem value="12">12</SelectItem>
+              <SelectItem value="24">24</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Display Doctors */}
+      <div className="mb-6">
+        {viewMode === "grid" ? renderDoctorGrid() : renderDoctorTable()}
+      </div>
+
+      {/* Pagination Controls */}
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-muted-foreground">
+          Showing {Math.min(filteredDoctors.length, 1 + (currentPage - 1) * doctorsPerPage)}-
+          {Math.min(currentPage * doctorsPerPage, filteredDoctors.length)} of {filteredDoctors.length} doctors
+        </div>
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1}
+          >
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+            disabled={currentPage === totalPages}
+          >
+            Next
+          </Button>
+        </div>
+      </div>
+      
+      {/* Doctor Form Dialog */}
+      {(showAddDialog || showEditDialog) && (
+        <DoctorFormDialog
+          doctor={selectedDoctor}
+          open={showAddDialog || showEditDialog}
+          onClose={handleCloseAllDialogs}
+          onSave={handleSaveDoctor}
+          specialties={specialties}
+        />
       )}
       
-      {/* Dialogs */}
-      <DoctorFormDialog
-        open={showAddDialog || showEditDialog}
-        onOpenChange={showAddDialog ? setShowAddDialog : setShowEditDialog}
-        doctor={showEditDialog ? selectedDoctor : null}
-        mode={showEditDialog ? 'edit' : 'add'}
-        onSave={handleSaveDoctor}
-      />
+      {/* Doctor View Dialog */}
+      {showViewDialog && selectedDoctor && (
+        <DoctorDetailsDialog
+          doctor={selectedDoctor}
+          open={showViewDialog}
+          onClose={handleCloseAllDialogs}
+          onEdit={() => {
+            setShowViewDialog(false);
+            setShowEditDialog(true);
+          }}
+        />
+      )}
       
-      <DoctorDetailsDialog
-        open={showViewDialog}
-        onOpenChange={setShowViewDialog}
-        doctor={selectedDoctor}
-        onEdit={() => {
-          setShowViewDialog(false);
-          setShowEditDialog(true);
-        }}
-        onDelete={() => {
-          setShowViewDialog(false);
-          setShowDeleteDialog(true);
-        }}
-      />
-      
-      <DoctorDeleteDialog
-        open={showDeleteDialog}
-        onOpenChange={setShowDeleteDialog}
-        doctor={selectedDoctor}
-        onConfirm={handleConfirmDelete}
-      />
+      {/* Doctor Delete Dialog */}
+      {showDeleteDialog && selectedDoctor && (
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure you want to delete this doctor?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete 
+                {selectedDoctor.user?.firstName ? ` ${selectedDoctor.user.firstName} ${selectedDoctor.user.lastName}` : " the doctor"} 
+                and all associated data.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={handleCloseAllDialogs}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 };
