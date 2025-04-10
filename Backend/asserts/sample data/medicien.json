@@ -1,0 +1,67 @@
+[
+    {
+      "name": "Paracetamol",
+      "description": "Used to treat fever, headaches, and other mild pain.",
+      "manufacturer": "ABC Pharma",
+      "category": "Tablet",
+      "price": 10.5,
+      "stock": 150,
+      "expiryDate": "2026-08-20T00:00:00Z",
+      "dosageForm": "Oral",
+      "strength": "500mg",
+      "image": "/images/paracetamol.jpg",
+      "sideEffects": ["Nausea", "Dizziness", "Allergic reaction"],
+      "contraindications": ["Liver disease", "Alcohol consumption"],
+      "requiresPrescription": false,
+      "isActive": true
+    },
+    {
+      "name": "Amoxicillin",
+      "description": "An antibiotic used to treat various bacterial infections.",
+      "manufacturer": "XYZ Labs",
+      "category": "Capsule",
+      "price": 20.0,
+      "stock": 80,
+      "expiryDate": "2025-12-15T00:00:00Z",
+      "dosageForm": "Oral",
+      "strength": "250mg",
+      "image": "/images/amoxicillin.jpg",
+      "sideEffects": ["Diarrhea", "Nausea", "Rash"],
+      "contraindications": ["Allergy to penicillin", "Liver dysfunction"],
+      "requiresPrescription": true,
+      "isActive": true
+    },
+    {
+      "name": "Ventolin",
+      "description": "A medication used to relieve asthma symptoms.",
+      "manufacturer": "DEF Pharma",
+      "category": "Inhaler",
+      "price": 25.0,
+      "stock": 50,
+      "expiryDate": "2024-11-01T00:00:00Z",
+      "dosageForm": "Inhalation",
+      "strength": "100mcg",
+      "image": "/images/ventolin.jpg",
+      "sideEffects": ["Tremors", "Headache", "Palpitations"],
+      "contraindications": ["Heart problems", "High blood pressure"],
+      "requiresPrescription": true,
+      "isActive": true
+    },
+    {
+      "name": "Betadine Cream",
+      "description": "An antiseptic ointment used for minor cuts and burns.",
+      "manufacturer": "GHI Med",
+      "category": "Ointment",
+      "price": 15.0,
+      "stock": 200,
+      "expiryDate": "2027-05-10T00:00:00Z",
+      "dosageForm": "Topical",
+      "strength": "5%",
+      "image": "/images/betadine_cream.jpg",
+      "sideEffects": ["Skin irritation", "Allergic reaction"],
+      "contraindications": ["Open wounds", "Hypersensitivity to iodine"],
+      "requiresPrescription": false,
+      "isActive": true
+    }
+  ]
+  

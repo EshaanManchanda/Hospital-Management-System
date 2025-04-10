@@ -1,0 +1,57 @@
+[
+    {
+      "patient": "USR-12345678",  
+      "doctor": "USR-12345678",   
+      "diagnosis": "Hypertension",
+      "treatment": "Lifestyle changes, Medication",
+      "notes": "Patient needs regular monitoring of blood pressure.",
+      "attachments": [
+        {
+          "filename": "blood_test_results.pdf",
+          "filePath": "/uploads/reports/blood_test_results.pdf",
+          "fileType": "application/pdf",
+          "uploadDate": "2025-04-10T10:00:00Z"
+        }
+      ],
+      "vitalSigns": {
+        "temperature": 98.6,
+        "heartRate": 72,
+        "bloodPressure": "120/80",
+        "respiratoryRate": 16,
+        "oxygenSaturation": 98,
+        "height": 175,
+        "weight": 70
+      },
+      "date": "2025-04-10T10:00:00Z",
+      "followUpDate": "2025-05-10T10:00:00Z",
+      "status": "open"
+    },
+    {
+      "patient": "USR-12345679",  
+      "doctor": "USR-12345678",   
+      "diagnosis": "Diabetes",
+      "treatment": "Insulin Therapy",
+      "notes": "Patient has been prescribed insulin, needs to monitor blood sugar levels regularly.",
+      "attachments": [
+        {
+          "filename": "xray_report.pdf",
+          "filePath": "/uploads/reports/xray_report.pdf",
+          "fileType": "application/pdf",
+          "uploadDate": "2025-04-12T14:00:00Z"
+        }
+      ],
+      "vitalSigns": {
+        "temperature": 98.7,
+        "heartRate": 75,
+        "bloodPressure": "130/85",
+        "respiratoryRate": 18,
+        "oxygenSaturation": 97,
+        "height": 160,
+        "weight": 65
+      },
+      "date": "2025-04-12T14:00:00Z",
+      "followUpDate": "2025-05-12T14:00:00Z",
+      "status": "open"
+    }
+  ]
+  

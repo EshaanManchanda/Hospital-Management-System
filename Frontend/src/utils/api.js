@@ -7,17 +7,20 @@ import appointmentService from '../services/appointmentService';
 
 // Get the API URL from environment variables or use the fallback
 const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-// No need to append /api as it's included in the routes
-const apiTimeout = parseInt(import.meta.env.VITE_API_TIMEOUT || '45000');
+// Ensure we have the correct base URL structure
+const apiBaseUrlWithoutApi = apiBaseUrl.endsWith('/api') 
+  ? apiBaseUrl.slice(0, -4) 
+  : apiBaseUrl;
 
 console.log('API configured with:', { 
-  baseUrl: apiBaseUrl,
-  timeout: apiTimeout 
+  baseUrl: apiBaseUrlWithoutApi,
+  withCredentials: true,
+  fullUrl: `${apiBaseUrlWithoutApi}/api/auth/login`
 });
 
 // Create axios instance
 const api = axios.create({
-  baseURL: apiBaseUrl,  // Use apiBaseUrl directly without appending /api
+  baseURL: apiBaseUrlWithoutApi,  // Use base URL without /api
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
@@ -28,6 +31,12 @@ const api = axios.create({
 // Request interceptor for adding auth token
 api.interceptors.request.use(
   (config) => {
+    // Log all outgoing requests for debugging
+    console.log(`API Request: ${config.method.toUpperCase()} ${config.baseURL}${config.url}`, {
+      headers: config.headers,
+      withCredentials: config.withCredentials
+    });
+    
     // Get token from localStorage
     const token = localStorage.getItem('token');
     
@@ -47,6 +56,11 @@ api.interceptors.request.use(
 // Response interceptor for handling errors
 api.interceptors.response.use(
   (response) => {
+    // Log successful responses
+    console.log(`API Response Success: ${response.config.method.toUpperCase()} ${response.config.url}`, {
+      status: response.status,
+      data: response.data
+    });
     return response;
   },
   (error) => {
@@ -58,13 +72,21 @@ api.interceptors.response.use(
       // that falls out of the range of 2xx
       console.error('Response data:', error.response.data);
       console.error('Response status:', error.response.status);
+      console.error('Request URL:', error.config.baseURL + error.config.url);
       
       // Handle authentication errors
-      if (error.response.status === 401 || error.response.status === 403) {
-        // Check if it's a token expiration error
+      if (error.response.status === 401) {
+        console.error('Authentication Error Details:', {
+          url: error.config.url,
+          method: error.config.method,
+          data: error.config.data,
+          message: error.response.data.message || 'Authentication failed'
+        });
+        
+        // Check if it's a token expiration error or invalid credentials
         if (error.response.data.message && 
             (error.response.data.message.includes('expired') || 
-             error.response.data.message.includes('invalid'))) {
+             error.response.data.message.includes('invalid token'))) {
           toast.error('Your session has expired. Please login again.');
           // Clear auth data
           localStorage.removeItem('token');
@@ -74,12 +96,16 @@ api.interceptors.response.use(
           setTimeout(() => {
             window.location.href = '/login';
           }, 1500);
+        } else {
+          // Most likely invalid credentials - don't show toast here
+          // Let the login component handle the error message
+          console.error('Login credentials error:', error.response.data.message || 'Invalid credentials');
         }
       }
     } else if (error.request) {
       // The request was made but no response was received
       console.error('Request made but no response received:', error.request);
-      toast.error('No response from server. Please check your connection.');
+      toast.error('No response from server. Please check your connection and make sure the backend is running.');
     } else {
       // Something happened in setting up the request that triggered an Error
       console.error('Error setting up request:', error.message);

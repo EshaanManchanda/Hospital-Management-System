@@ -1,0 +1,30 @@
+{
+    "userId": "USR-12345678",
+    "name": "Dr. Alice Johnson",
+    "email": "alice.johnson@example.com",
+    "password": "doctorpass123",
+    "role": "doctor",
+    "mobile": "9876543210",
+    "address": {
+      "street": "10 Medical Rd",
+      "city": "Los Angeles",
+      "state": "CA",
+      "zipCode": "90002",
+      "country": "USA"
+    },
+    "profileImage": "doctor_profile.jpg",
+    "qualifications": [
+      {
+        "degree": "MD",
+        "institution": "XYZ Medical School",
+        "year": 2010
+      }
+    ],
+    "dateOfBirth": "1980-07-20T00:00:00Z",
+    "gender": "female",
+    "isActive": true,
+    "isVerified": true,
+    "createdAt": "2025-04-09T10:00:00Z",
+    "updatedAt": "2025-04-09T10:00:00Z"
+  }
+  

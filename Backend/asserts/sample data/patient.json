@@ -1,0 +1,132 @@
+[
+    {
+      "userId": "USR-12345678",
+      "name": "John Doe",
+      "email": "john.doe@example.com",
+      "password": "password123",
+      "role": "patient",
+      "mobile": "1234567890",
+      "address": {
+        "street": "123 Main St",
+        "city": "New York",
+        "state": "NY",
+        "zipCode": "10001",
+        "country": "USA"
+      },
+      "profileImage": "profile1.jpg",
+      "qualifications": [],
+      "dateOfBirth": "1990-05-15T00:00:00Z",
+      "gender": "male",
+      "isActive": true,
+      "isVerified": true,
+      "createdAt": "2025-04-09T10:00:00Z",
+      "updatedAt": "2025-04-09T10:00:00Z",
+      "medicalHistory": [
+        {
+          "diagnosis": "Hypertension",
+          "treatment": "Lifestyle changes, Medication",
+          "doctor": "USR-23456789", 
+          "date": "2025-04-01T00:00:00Z",
+          "notes": "Regular monitoring required."
+        }
+      ],
+      "medications": [
+        {
+          "medicine": "Med-123456", 
+          "dosage": "500mg",
+          "frequency": "Twice a day",
+          "startDate": "2025-04-01T00:00:00Z",
+          "endDate": "2025-06-01T00:00:00Z",
+          "prescribedBy": "USR-23456789" 
+        }
+      ]
+    },
+    {
+      "userId": "USR-23456789",
+      "name": "Dr. Jane Smith",
+      "email": "dr.jane.smith@example.com",
+      "password": "doctorpass123",
+      "role": "doctor",
+      "mobile": "0987654321",
+      "address": {
+        "street": "456 Health Rd",
+        "city": "Los Angeles",
+        "state": "CA",
+        "zipCode": "90001",
+        "country": "USA"
+      },
+      "profileImage": "profile2.jpg",
+      "qualifications": [
+        {
+          "degree": "MD",
+          "institution": "ABC Medical School",
+          "year": 2010
+        }
+      ],
+      "dateOfBirth": "1985-08-25T00:00:00Z",
+      "gender": "female",
+      "isActive": true,
+      "isVerified": true,
+      "createdAt": "2025-04-09T11:00:00Z",
+      "updatedAt": "2025-04-09T11:00:00Z"
+    },
+    {
+      "userId": "USR-34567890",
+      "name": "Admin User",
+      "email": "admin@example.com",
+      "password": "adminpass123",
+      "role": "admin",
+      "mobile": "1122334455",
+      "address": {
+        "street": "789 Admin Blvd",
+        "city": "Chicago",
+        "state": "IL",
+        "zipCode": "60007",
+        "country": "USA"
+      },
+      "profileImage": "admin_profile.jpg",
+      "qualifications": [
+        {
+          "degree": "MBA",
+          "institution": "DEF Business School",
+          "year": 2012
+        }
+      ],
+      "dateOfBirth": "1980-12-10T00:00:00Z",
+      "gender": "male",
+      "isActive": true,
+      "isVerified": true,
+      "createdAt": "2025-04-09T12:00:00Z",
+      "updatedAt": "2025-04-09T12:00:00Z"
+    },
+    {
+      "userId": "USR-45678901",
+      "name": "Sarah Lee",
+      "email": "sarah.lee@example.com",
+      "password": "password123",
+      "role": "nurse",
+      "mobile": "2233445566",
+      "address": {
+        "street": "101 Healthcare St",
+        "city": "San Francisco",
+        "state": "CA",
+        "zipCode": "94105",
+        "country": "USA"
+      },
+      "profileImage": "nurse_profile.jpg",
+      "qualifications": [
+        {
+          "degree": "Nursing Diploma",
+          "institution": "GHI Nursing College",
+          "year": 2018
+        }
+      ],
+      "dateOfBirth": "1995-03-10T00:00:00Z",
+      "gender": "female",
+      "isActive": true,
+      "isVerified": false,
+      "createdAt": "2025-04-09T13:00:00Z",
+      "updatedAt": "2025-04-09T13:00:00Z"
+    }
+  ]
+  

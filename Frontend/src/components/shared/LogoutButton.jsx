@@ -1,14 +1,16 @@
 import React from "react";
 import { LogOut } from "lucide-react";
-import authService from "../../services/authService";
 import { toast } from "react-hot-toast";
+import { useAuth } from "../../contexts/AuthContext";
 
 const LogoutButton = ({ className = "" }) => {
+  const { logout } = useAuth();
+
   const handleLogout = async () => {
     try {
-      // Use the updated async authService logout method
-      await authService.logout();
-      // No need to handle navigation as it's done in authService.logout
+      // Use the updated auth context logout method 
+      // which will handle navigation to the home page
+      await logout();
     } catch (error) {
       console.error("Logout error:", error);
       toast.error("Error during logout");

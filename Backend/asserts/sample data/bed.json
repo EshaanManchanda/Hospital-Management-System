@@ -1,0 +1,55 @@
+[
+    {
+      "bedNumber": "B001",
+      "ward": "General",
+      "status": "Available",
+      "patient": null,
+      "assignedDoctor": null,
+      "admissionDate": null,
+      "expectedDischargeDate": null,
+      "price": 100,
+      "notes": "Standard general ward bed",
+      "createdAt": "2025-04-09T10:00:00Z",
+      "updatedAt": "2025-04-09T10:00:00Z"
+    },
+    {
+      "bedNumber": "B002",
+      "ward": "ICU",
+      "status": "Occupied",
+      "patient": "USR-12345678",  
+      "assignedDoctor": "USR-12345678",  
+      "admissionDate": "2025-04-05T14:00:00Z",
+      "expectedDischargeDate": "2025-04-10T10:00:00Z",
+      "price": 500,
+      "notes": "ICU bed for critical care",
+      "createdAt": "2025-04-05T14:00:00Z",
+      "updatedAt": "2025-04-05T14:00:00Z"
+    },
+    {
+      "bedNumber": "B003",
+      "ward": "Emergency",
+      "status": "Maintenance",
+      "patient": null,
+      "assignedDoctor": null,
+      "admissionDate": null,
+      "expectedDischargeDate": null,
+      "price": 200,
+      "notes": "Bed under maintenance, unavailable for use",
+      "createdAt": "2025-04-09T11:00:00Z",
+      "updatedAt": "2025-04-09T11:00:00Z"
+    },
+    {
+      "bedNumber": "B004",
+      "ward": "Maternity",
+      "status": "Available",
+      "patient": null,
+      "assignedDoctor": null,
+      "admissionDate": null,
+      "expectedDischargeDate": null,
+      "price": 300,
+      "notes": "Maternity bed available for new patient",
+      "createdAt": "2025-04-09T12:00:00Z",
+      "updatedAt": "2025-04-09T12:00:00Z"
+    }
+  ]
+  

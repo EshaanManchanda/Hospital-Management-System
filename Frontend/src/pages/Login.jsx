@@ -7,6 +7,7 @@ import { useGoogleAuth } from '../contexts/GoogleAuthContext';
 import { useAuth } from '../contexts/AuthContext';
 import LoginForm from '../components/LoginForm';
 import { ROUTES } from '../config/constants';
+import { checkBackendConnectivity, performCleanLogin } from '../utils/debugUtils';
 
 const Login = () => {
   const location = useLocation();
@@ -17,6 +18,9 @@ const Login = () => {
   const [processingToken, setProcessingToken] = useState(false);
   const [loginError, setLoginError] = useState(null);
   const [selectedRole, setSelectedRole] = useState('patient');
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [diagnosticResults, setDiagnosticResults] = useState(null);
+  const [runningDiagnostics, setRunningDiagnostics] = useState(false);
 
   // Process URL parameters (token or error) on component mount
   useEffect(() => {
@@ -146,6 +150,38 @@ const Login = () => {
     }
   };
 
+  // Add a diagnostic function
+  const runDiagnostics = async () => {
+    setRunningDiagnostics(true);
+    try {
+      console.log('Running backend connectivity diagnostics...');
+      const results = await checkBackendConnectivity();
+      setDiagnosticResults(results);
+      
+      if (!results.success) {
+        toast.error('Backend connectivity issues detected. See console for details.');
+      } else {
+        toast.success('Backend connectivity check passed!');
+      }
+    } catch (error) {
+      console.error('Error running diagnostics:', error);
+      setDiagnosticResults({
+        success: false,
+        message: error.message || 'Unknown error running diagnostics',
+      });
+      toast.error('Error running diagnostics');
+    } finally {
+      setRunningDiagnostics(false);
+    }
+  };
+  
+  // Add a function to clear all storage data
+  const handleCleanLogin = () => {
+    if (window.confirm('This will clear all saved login data. Continue?')) {
+      performCleanLogin();
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
@@ -164,6 +200,68 @@ const Login = () => {
         {loginError && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
             <span className="block sm:inline">{loginError}</span>
+            
+            {/* Add a troubleshooting link */}
+            <div className="mt-2 text-sm">
+              <button 
+                type="button"
+                onClick={() => setShowDiagnostics(!showDiagnostics)}
+                className="text-red-800 hover:text-red-900 underline"
+              >
+                {showDiagnostics ? 'Hide troubleshooting' : 'Show troubleshooting options'}
+              </button>
+            </div>
+          </div>
+        )}
+        
+        {/* Diagnostic section */}
+        {showDiagnostics && (
+          <div className="bg-gray-50 border border-gray-200 p-4 rounded-md">
+            <h3 className="text-base font-medium mb-3">Login Troubleshooting</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-gray-600 mb-2">
+                  Check if the backend server is reachable:
+                </p>
+                <button
+                  type="button"
+                  onClick={runDiagnostics}
+                  disabled={runningDiagnostics}
+                  className="bg-gray-100 hover:bg-gray-200 text-gray-800 py-1 px-3 rounded text-sm border border-gray-300"
+                >
+                  {runningDiagnostics ? 'Running check...' : 'Check Backend Connection'}
+                </button>
+              </div>
+              
+              {diagnosticResults && (
+                <div className={`p-3 rounded text-sm ${
+                  diagnosticResults.success ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
+                }`}>
+                  <p className="font-medium">{diagnosticResults.message}</p>
+                  {!diagnosticResults.success && (
+                    <p className="mt-1">
+                      Make sure the backend server is running and check your API URL configuration.
+                    </p>
+                  )}
+                </div>
+              )}
+              
+              <div className="border-t pt-3">
+                <p className="text-sm text-gray-600 mb-2">
+                  Other troubleshooting options:
+                </p>
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={handleCleanLogin}
+                    className="bg-gray-100 hover:bg-gray-200 text-gray-800 py-1 px-3 rounded text-sm border border-gray-300 w-full text-left"
+                  >
+                    Clear All Saved Data & Refresh
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
         
