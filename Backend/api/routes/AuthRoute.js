@@ -12,7 +12,8 @@ import {
   refreshToken,
   logout,
   verifyToken,
-  me
+  me,
+  verifyResetToken
 } from '../controllers/AuthController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { validateRequest, schemas } from '../middleware/validateRequest.js';
@@ -27,6 +28,7 @@ router.get('/profile', protect, getUserProfile);
 router.put('/profile', protect, updateUserProfile);
 router.post('/forgotpassword', forgotPassword);
 router.put('/resetpassword/:resetToken', resetPassword);
+router.get('/verify-reset-token/:token', verifyResetToken);
 
 // Google authentication
 router.post('/google', loginWithGoogle);

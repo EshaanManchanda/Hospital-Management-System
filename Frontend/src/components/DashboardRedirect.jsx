@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
+import { authService } from '../services';
 
 /**
  * Component that redirects users to the appropriate dashboard based on their role
- * This version directly checks localStorage for authentication data
+ * This uses localStorage for authentication data and validates the token before redirecting
  */
 const DashboardRedirect = () => {
   const [destination, setDestination] = useState(null);
@@ -12,13 +13,13 @@ const DashboardRedirect = () => {
   const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
-    const checkAuthAndRedirect = () => {
+    const checkAuthAndRedirect = async () => {
       try {
         // Directly check localStorage for authentication data
         const token = localStorage.getItem('token');
         const userDataStr = localStorage.getItem('userData');
         
-        console.log('DashboardRedirect - Local Storage:', { 
+        console.log('DashboardRedirect - Auth check:', { 
           hasToken: !!token, 
           hasUserData: !!userDataStr
         });
@@ -30,12 +31,28 @@ const DashboardRedirect = () => {
           return;
         }
         
+        // Verify token validity with the backend
+        try {
+          const isValid = await authService.verifyToken();
+          if (!isValid) {
+            console.error('DashboardRedirect - Invalid or expired token');
+            setError('Your session has expired. Please log in again.');
+            setDestination('/login');
+            return;
+          }
+        } catch (tokenError) {
+          console.error('DashboardRedirect - Token verification failed:', tokenError);
+          setError('Authentication error. Please log in again.');
+          setDestination('/login');
+          return;
+        }
+        
         // Parse user data from localStorage
         const userData = JSON.parse(userDataStr);
         console.log('DashboardRedirect - User data found:', userData);
         
         // Get role from user data
-        const userRole = userData?.role;
+        const userRole = userData?.role?.toLowerCase();
         
         if (!userRole) {
           console.error('DashboardRedirect - No role found in user data');
@@ -45,7 +62,7 @@ const DashboardRedirect = () => {
         }
         
         // Determine redirect path based on role
-        switch (userRole.toLowerCase()) {
+        switch (userRole) {
           case 'admin':
             console.log('DashboardRedirect - Admin role detected, redirecting to admin dashboard');
             setDestination('/admin-dashboard');
@@ -58,15 +75,27 @@ const DashboardRedirect = () => {
             console.log('DashboardRedirect - Patient role detected, redirecting to patient dashboard');
             setDestination('/patient-dashboard');
             break;
+          case 'nurse':
+            console.log('DashboardRedirect - Nurse role detected, redirecting to nurse dashboard');
+            setDestination('/nurse-dashboard');
+            break;
+          case 'receptionist':
+            console.log('DashboardRedirect - Receptionist role detected, redirecting to receptionist dashboard');
+            setDestination('/receptionist-dashboard');
+            break;
+          case 'pharmacist':
+            console.log('DashboardRedirect - Pharmacist role detected, redirecting to pharmacy dashboard');
+            setDestination('/pharmacy-dashboard');
+            break;
           default:
             console.warn(`DashboardRedirect - Unknown role detected: ${userRole}`);
-            setError(`Unknown role: ${userRole}`);
-            setDestination('/');
+            setError(`Unknown role: ${userRole}. Please contact support.`);
+            setDestination('/login');
         }
       } catch (err) {
         console.error('DashboardRedirect - Error determining redirect:', err);
-        setError('Error determining appropriate dashboard');
-        setDestination('/');
+        setError('Error determining appropriate dashboard. Please try logging in again.');
+        setDestination('/login');
       } finally {
         setIsLoading(false);
       }
@@ -94,7 +123,7 @@ const DashboardRedirect = () => {
   }
   
   // Redirect when destination is determined
-  return <Navigate to={destination || '/'} replace />;
+  return <Navigate to={destination || '/login'} replace />;
 };
 
 export default DashboardRedirect; 

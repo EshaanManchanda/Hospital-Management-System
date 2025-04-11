@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import api from '../utils/api';
 import { useDispatch } from 'react-redux';
-import authService from '../services/authService';
+import { authService } from '../services';
 import { useAuth } from './AuthContext';
 import { API_BASE_URL, ROUTES } from '../config/constants';
 

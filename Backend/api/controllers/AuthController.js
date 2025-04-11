@@ -460,6 +460,49 @@ export const resetPassword = async (req, res) => {
   }
 };
 
+// Verify reset token
+export const verifyResetToken = async (req, res) => {
+  try {
+    // Hash the token from params
+    const resetPasswordToken = crypto
+      .createHash('sha256')
+      .update(req.params.token)
+      .digest('hex');
+
+    console.log('Verifying reset token:', req.params.token);
+    console.log('Hashed token:', resetPasswordToken);
+
+    // Check if a user exists with this token and it hasn't expired
+    const user = await User.findOne({
+      resetPasswordToken,
+      resetPasswordExpire: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      console.log('No user found with the provided reset token or token expired');
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired token'
+      });
+    }
+
+    console.log('Valid reset token for user:', user.email);
+    
+    // Token is valid
+    return res.status(200).json({
+      success: true,
+      message: 'Token is valid',
+      email: user.email
+    });
+  } catch (error) {
+    console.error('Verify reset token error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server Error'
+    });
+  }
+};
+
 // Login with Google
 export const loginWithGoogle = async (req, res) => {
   try {

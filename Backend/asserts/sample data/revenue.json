@@ -1,0 +1,46 @@
+[
+    {
+      "date": "2025-04-01T10:00:00Z",
+      "amount": 150.0,
+      "source": "Appointment",
+      "description": "Payment for regular appointment with Dr. Alice Johnson",
+      "patient": "USR-12345678",  
+      "doctor": "USR-12345678",   
+      "referenceId": "APPT-001",
+      "paymentMethod": "Cash",
+      "status": "Paid"
+    },
+    {
+      "date": "2025-04-03T15:30:00Z",
+      "amount": 50.0,
+      "source": "Medicine",
+      "description": "Payment for prescribed medicines",
+      "patient": "USR-12345678",  
+      "doctor": "USR-12345678",   
+      "referenceId": "MED-001",
+      "paymentMethod": "Card",
+      "status": "Paid"
+    },
+    {
+      "date": "2025-04-05T08:00:00Z",
+      "amount": 500.0,
+      "source": "Surgery",
+      "description": "Payment for heart surgery performed by Dr. Alice Johnson",
+      "patient": "USR-12345679",  
+      "doctor": "USR-12345678",   
+      "referenceId": "SURG-001",
+      "paymentMethod": "Bank Transfer",
+      "status": "Paid"
+    },
+    {
+      "date": "2025-04-07T12:00:00Z",
+      "amount": 200.0,
+      "source": "Appointment",
+      "description": "Payment for follow-up appointment with Dr. Alice Johnson",
+      "patient": "USR-12345679",  
+      "doctor": "USR-12345678",   
+      "paymentMethod": "Insurance",
+      "status": "Paid"
+    }
+  ]
+  

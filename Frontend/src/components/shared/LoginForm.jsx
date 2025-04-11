@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { FaEnvelope, FaLock, FaSignInAlt, FaExclamationTriangle, FaGoogle } from "react-icons/fa";
 import { authService } from "../../services";
+import api from "../../utils/api";
 import { testApiConnection as apiConnectionTest, testAuthentication } from "../../debug-api";
 import { useLogin } from "../../contexts/LoginContext";
 import { useGoogleAuth } from "../../contexts/GoogleAuthContext";
@@ -148,6 +149,40 @@ const LoginForm = () => {
         throw new Error(response.message || "Login failed. Please check your credentials.");
       }
       
+      // Log successful login response for debugging
+      console.log("Login response:", response);
+      
+      // Verify token was properly stored in localStorage 
+      const storedToken = localStorage.getItem('token');
+      if (!storedToken) {
+        console.error("Token not found in localStorage after login");
+        // Try to manually set it one more time from the response
+        if (response.token) {
+          localStorage.setItem('token', response.token);
+          console.log("Manually set token from response");
+          api.defaults.headers.common['Authorization'] = `Bearer ${response.token}`;
+        } else {
+          toast.error("Authentication error. Could not save token.");
+          setIsLoading(false);
+          return;
+        }
+      }
+      
+      // Verify user data was properly stored
+      const storedUserData = localStorage.getItem('userData');
+      if (!storedUserData) {
+        console.error("userData not found in localStorage after login");
+        // Try to manually set it one more time from the response
+        if (response.user) {
+          localStorage.setItem('userData', JSON.stringify(response.user));
+          console.log("Manually set userData from response");
+        } else {
+          toast.error("Authentication error. Could not save user data.");
+          setIsLoading(false);
+          return;
+        }
+      }
+      
       // Reset form after successful login
       setFormData({
         email: "",
@@ -156,11 +191,13 @@ const LoginForm = () => {
       
       setLoginSuccess(true);
       
-      // Get the user role from the response data
-      const userData = response.data.user;
-      const userRole = userData.role;
+      // Get user role from the response
+      const userRole = response.role || response.user?.role;
       
-      console.log("User role for navigation:", userRole);
+      console.log("User role from response:", userRole);
+      
+      // Show success toast notification
+      toast.success(`Welcome back, ${response.user?.name || 'User'}!`);
       
       // Check for redirect path in session storage
       const redirectPath = sessionStorage.getItem('redirectAfterLogin');
@@ -179,6 +216,10 @@ const LoginForm = () => {
           navigate("/doctor-dashboard", { replace: true });
           break;
         case 'patient':
+          // Check if we have a patientId for patients
+          if (response.user?.patientId) {
+            console.log("Navigating to patient dashboard with patientId:", response.user.patientId);
+          }
           navigate("/patient-dashboard", { replace: true });
           break;
         case 'nurse':
@@ -189,10 +230,13 @@ const LoginForm = () => {
           break;
         default:
           // Default to home page if role is unknown
+          console.warn("Unknown user role:", userRole);
           navigate("/", { replace: true });
       }
     } catch (err) {
+      console.error("Login error:", err);
       setError(err.message || "Failed to login. Please check your credentials.");
+      toast.error(err.message || "Login failed. Please try again.");
       
       // If normal login fails, try the test authentication
       if (process.env.NODE_ENV === 'development') {

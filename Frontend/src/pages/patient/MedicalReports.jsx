@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { Download, Upload, FileText, Plus, AlertCircle, Check } from "lucide-react";
-import { authService, patientService } from "../../services";
+import { authService, getPatientService } from "../../services";
+
+// Define patientService at module level
+let patientService;
 
 const MedicalReports = () => {
   const [loading, setLoading] = useState(true);
   const [reports, setReports] = useState([]);
   const [error, setError] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState(null);
   const [uploadError, setUploadError] = useState(null);
   const [showUploadForm, setShowUploadForm] = useState(false);
   
@@ -19,12 +22,42 @@ const MedicalReports = () => {
     file: null
   });
 
+  // Load patientService
+  useEffect(() => {
+    const loadPatientService = async () => {
+      try {
+        // Try first to get it from the getter
+        patientService = getPatientService();
+        
+        // If not available, import directly
+        if (!patientService) {
+          const module = await import('../../services/patientService');
+          patientService = module.default;
+        }
+      } catch (error) {
+        console.error("Error loading patientService:", error);
+        setError("Failed to load required services. Please refresh the page.");
+      }
+    };
+    
+    loadPatientService();
+  }, []);
+
   useEffect(() => {
     const fetchReports = async () => {
       try {
         setLoading(true);
-        const userData = authService.getUserData();
         
+        // Make sure patientService is loaded
+        if (!patientService) {
+          patientService = getPatientService();
+          if (!patientService) {
+            const module = await import('../../services/patientService');
+            patientService = module.default;
+          }
+        }
+        
+        const userData = authService.getUserData();
         if (!userData || !userData.patientId) {
           throw new Error("Patient information not found");
         }
@@ -32,8 +65,8 @@ const MedicalReports = () => {
         const response = await patientService.getPatientReports(userData.patientId);
         setReports(response.data || []);
       } catch (err) {
-        console.error("Error fetching medical reports:", err);
-        setError(err.message || "Failed to load medical reports");
+        console.error("Error fetching reports:", err);
+        setError("Failed to load your medical reports");
       } finally {
         setLoading(false);
       }
@@ -60,51 +93,68 @@ const MedicalReports = () => {
 
   const handleUploadReport = async (e) => {
     e.preventDefault();
-    setIsUploading(true);
-    setUploadSuccess(false);
-    setUploadError(null);
-    
     try {
-      const userData = authService.getUserData();
+      if (!reportData.file) {
+        setUploadError('Please select a file to upload');
+        return;
+      }
       
+      if (!reportData.title.trim()) {
+        setUploadError('Please provide a title for the report');
+        return;
+      }
+      
+      setIsUploading(true);
+      setUploadError(null);
+      
+      // Make sure patientService is loaded
+      if (!patientService) {
+        patientService = getPatientService();
+        if (!patientService) {
+          const module = await import('../../services/patientService');
+          patientService = module.default;
+        }
+      }
+      
+      const userData = authService.getUserData();
       if (!userData || !userData.patientId) {
         throw new Error("Patient information not found");
       }
       
-      if (!reportData.file) {
-        throw new Error("Please select a file to upload");
-      }
-      
-      const formData = {
-        title: reportData.title,
-        type: reportData.type,
-        notes: reportData.notes,
-        file: reportData.file
-      };
+      const formData = new FormData();
+      formData.append('file', reportData.file);
+      formData.append('title', reportData.title);
+      formData.append('type', reportData.type);
+      formData.append('notes', reportData.notes);
       
       const response = await patientService.uploadPatientReport(userData.patientId, formData);
       
-      // Add the new report to the list
-      setReports(prev => [response.data, ...prev]);
-      
-      // Reset form
-      setReportData({
-        title: "",
-        type: "",
-        notes: "",
-        file: null
-      });
-      
-      setUploadSuccess(true);
-      setShowUploadForm(false);
-      
-      // Clear success message after 3 seconds
-      setTimeout(() => {
-        setUploadSuccess(false);
-      }, 3000);
+      if (response.success) {
+        // Add the new report to the list
+        setReports(prev => [response.data, ...prev]);
+        
+        // Reset the form
+        setReportData({
+          title: "",
+          type: "",
+          notes: "",
+          file: null
+        });
+        
+        // Show success message
+        setUploadSuccess('Report uploaded successfully');
+        
+        // Hide the upload form
+        setTimeout(() => {
+          setShowUploadForm(false);
+          setUploadSuccess(null);
+        }, 2000);
+      } else {
+        setUploadError(response.message || 'Failed to upload report');
+      }
     } catch (err) {
-      console.error("Error uploading report:", err);
-      setUploadError(err.message || "Failed to upload report");
+      console.error('Error uploading report:', err);
+      setUploadError(err.message || 'Failed to upload report');
     } finally {
       setIsUploading(false);
     }
@@ -139,7 +189,7 @@ const MedicalReports = () => {
       {uploadSuccess && (
         <div className="mb-4 p-4 bg-green-50 rounded-lg flex items-center text-green-700">
           <Check className="h-5 w-5 mr-2" />
-          <span>Report uploaded successfully!</span>
+          <span>{uploadSuccess}</span>
         </div>
       )}
 

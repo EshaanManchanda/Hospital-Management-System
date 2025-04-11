@@ -24,7 +24,6 @@ import { SpeedInsights } from "@vercel/speed-insights/react";
 import store from './store';
 import { toast } from 'react-hot-toast';
 import ProtectedRoute from "./components/shared/ProtectedRoute";
-import AuthDebugger from './components/shared/AuthDebugger';
 import DashboardRedirect from './components/DashboardRedirect';
 import { useDispatch } from 'react-redux';
 
@@ -34,6 +33,8 @@ import Footer from "./components/client/Footer";
 import ScrollToTopButton from "./components/client/ScrollToTopButton";
 import NotFound from "./components/client/NotFound";
 import GoogleOAuthCallback from "./components/GoogleOAuthCallback";
+import ForgotPassword from "./components/client/ForgotPassword";
+import ResetPassword from "./components/client/ResetPassword";
 
 // Import dashboard components
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -124,65 +125,12 @@ const AuthContent = () => {
 // AppContent component
 const AppContent = () => {
   const location = useLocation();
-  const navigate = useNavigate();
   const isPatientDashboard = location.pathname.startsWith('/patient-dashboard');
-  const [initialAuthChecked, setInitialAuthChecked] = useState(false);
-  const [user, setUser] = useState(null);
   
-  // Check initial auth state and redirect based on path
-  useEffect(() => {
-    const pathRequiresAuth = 
-      location.pathname.startsWith('/admin-dashboard') || 
-      location.pathname.startsWith('/doctor-dashboard') || 
-      location.pathname.startsWith('/patient-dashboard');
-    
-    if (pathRequiresAuth) {
-      const token = localStorage.getItem('token');
-      const userDataStr = localStorage.getItem('userData');
-      
-      if (!token || !userDataStr) {
-        navigate('/login', { replace: true });
-        return;
-      }
-      
-      try {
-        const userData = JSON.parse(userDataStr);
-        const userRole = userData?.role;
-        
-        // Check if user has correct role for the path
-        if (location.pathname.startsWith('/admin-dashboard') && userRole !== 'admin') {
-          toast.error('You do not have permission to access this page');
-          navigate('/', { replace: true });
-          return;
-        }
-        
-        if (location.pathname.startsWith('/doctor-dashboard') && userRole !== 'doctor') {
-          toast.error('You do not have permission to access this page');
-          navigate('/', { replace: true });
-          return;
-        }
-        
-        if (location.pathname.startsWith('/patient-dashboard') && userRole !== 'patient') {
-          toast.error('You do not have permission to access this page');
-          navigate('/', { replace: true });
-          return;
-        }
-      } catch (err) {
-        console.error('Error parsing user data:', err);
-        navigate('/login', { replace: true });
-      }
-    }
-    
-    setInitialAuthChecked(true);
-  }, [location.pathname, navigate]);
-  
-  if (!initialAuthChecked) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gray-900"></div>
-      </div>
-    );
-  }
+  // Debug logging for auth status in AppContent
+  console.log('AppContent rendering, current location:', location.pathname);
+  console.log('AppContent localStorage token exists:', !!localStorage.getItem('token'));
+  console.log('AppContent localStorage userData exists:', !!localStorage.getItem('userData'));
 
   return (
     <>
@@ -201,7 +149,9 @@ const AppContent = () => {
               <Route index element={<Home />} />
               <Route path="login" element={<Login />} />
               <Route path="signup" element={<SignUp />} />
-              <Route path="about" element={<AboutUs />} />
+              <Route path="forgot-password" element={<ForgotPassword />} />
+              <Route path="reset-password/:token" element={<ResetPassword />} />
+              <Route path="about-us" element={<AboutUs />} />
               <Route path="contact" element={<ContactUs />} />
               <Route path="services" element={<TermsOfService />} />
               <Route path="privacy-policy" element={<PrivacyPolicy />} />
@@ -209,7 +159,6 @@ const AppContent = () => {
               <Route path="patients" element={<PatientsPage />} />
               <Route path="appointments" element={<AppointmentsPage />} />
               
-
               {/* Special route for handling Google OAuth callback */}
               <Route path="auth/google/callback" element={<GoogleOAuthCallback />} />
               
@@ -241,7 +190,7 @@ const AppContent = () => {
                     <Routes>
                       <Route path="/" element={<PatientDashboard />} />
                       <Route path="appointments" element={<Appointments />} />
-                      <Route path="medical-reports" element={<MedicalReports />} />
+                      <Route path="medical-records" element={<MedicalReports />} />
                       <Route path="new-appointment" element={<NewAppointment />} />
                       <Route path="beds" element={<PatientBeds />} />
                       <Route path="medications" element={<PatientMedications />} />
@@ -262,7 +211,6 @@ const AppContent = () => {
       <ReactHotToastToaster position="top-right" />
       <Toaster />
       <Sonner />
-      <AuthDebugger />
     </>
   );
 };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { 
   CalendarDays, 
   Clock, 
@@ -23,30 +23,57 @@ import {
   Pill,
   Shield
 } from "lucide-react";
-import { authService, patientService, appointmentService } from "../../services";
+import { authService, appointmentService, getPatientService } from "../../services";
+
+// Define patientService at module level
+let patientService;
 
 const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState(null);
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
+  const navigate = useNavigate();
+
+  // Load patientService
+  useEffect(() => {
+    const loadPatientService = async () => {
+      try {
+        // Try first to get it from the getter
+        patientService = getPatientService();
+        
+        // If not available, import directly
+        if (!patientService) {
+          const module = await import('../../services/patientService');
+          patientService = module.default;
+        }
+      } catch (error) {
+        console.error("Error loading patientService:", error);
+        setError("Failed to load required services. Please refresh the page.");
+      }
+    };
+    
+    loadPatientService();
+  }, []);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
         
-        // Check if we have a token
-        const token = localStorage.getItem('token');
-        if (!token) {
-          throw new Error("Authentication token not found. Please login again.");
+        // Make sure patientService is loaded
+        if (!patientService) {
+          patientService = getPatientService();
+          if (!patientService) {
+            const module = await import('../../services/patientService');
+            patientService = module.default;
+          }
         }
         
-        // Get user data from localStorage
         const userData = authService.getUserData();
         
         if (!userData || !userData.patientId) {
-          throw new Error("Patient information not found.");
+          throw new Error("Patient information not found");
         }
         
         // Initialize dashboard data object
@@ -55,29 +82,22 @@ const Dashboard = () => {
         try {
           // Get patient profile
           const patientResponse = await patientService.getPatientById(userData.patientId);
-          dashboardInfo.patient = patientResponse.data;
+          dashboardInfo.patient = patientResponse.patient;
         } catch (patientError) {
           console.error("Error fetching patient profile:", patientError);
-          dashboardInfo.patientError = "Could not retrieve patient profile information";
+          dashboardInfo.patientError = "Could not retrieve patient profile";
         }
         
         try {
-          // Get patient appointments
+          // Get upcoming appointments
           const appointmentsResponse = await appointmentService.getPatientAppointments(userData.patientId);
           dashboardInfo.appointments = appointmentsResponse.data;
         } catch (appointmentsError) {
           console.error("Error fetching appointments:", appointmentsError);
           dashboardInfo.appointmentsError = "Could not retrieve appointment information";
-          dashboardInfo.appointments = { data: [] };
         }
         
-        // Set the dashboard data with what we have
-        if (Object.keys(dashboardInfo).length > 0) {
-          setDashboardData(dashboardInfo);
-        } else {
-          throw new Error("Could not retrieve any dashboard information");
-        }
-        
+        setDashboardData(dashboardInfo);
       } catch (err) {
         console.error("Error fetching dashboard data:", err);
         setError(err.message || "Failed to load dashboard data");
@@ -85,7 +105,7 @@ const Dashboard = () => {
         setLoading(false);
       }
     };
-
+    
     fetchDashboardData();
   }, []);
 

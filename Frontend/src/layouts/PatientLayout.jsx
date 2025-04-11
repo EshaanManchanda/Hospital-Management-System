@@ -20,24 +20,43 @@ import {
   ChevronRight
 } from "lucide-react";
 import { authService } from "../services";
+import { useAuth } from "../contexts/AuthContext";
 import { FaTwitter, FaFacebookF, FaInstagram, FaLinkedinIn } from 'react-icons/fa';
 import Logo from '@/assets/logo.svg';
+import { toast } from "react-hot-toast";
 
-const PatientLayout = () => {
+const PatientLayout = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [notificationsCount, setNotificationsCount] = useState(3);
-  const [userName, setUserName] = useState("Patient");
-  const [userAvatar, setUserAvatar] = useState("https://randomuser.me/api/portraits/men/75.jpg");
+  const [userData, setUserData] = useState({
+    name: "Patient",
+    email: "",
+    avatar: "https://randomuser.me/api/portraits/men/75.jpg"
+  });
   
+  // Load user data on mount
   useEffect(() => {
-    // Set user data
-    const userData = authService.getUserData();
-    if (userData?.name) {
-      setUserName(userData.name);
-    }
+    const fetchUserData = () => {
+      try {
+        // Get user data from localStorage
+        const storedUserData = authService.getUserData();
+        if (storedUserData) {
+          setUserData({
+            name: storedUserData.name || storedUserData.firstName || "Patient",
+            email: storedUserData.email || "",
+            avatar: storedUserData.profileImage || storedUserData.avatar || "https://randomuser.me/api/portraits/men/75.jpg"
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+      }
+    };
+    
+    fetchUserData();
     
     // On small screens, default to closed sidebar
     const handleResize = () => {
@@ -61,16 +80,34 @@ const PatientLayout = () => {
     setSidebarOpen(!sidebarOpen);
   };
 
-  const handleLogout = () => {
-    authService.logout();
-    navigate("/login");
+  // Close sidebar on mobile after navigation
+  const closeSidebarOnMobile = () => {
+    if (window.innerWidth < 1024) {
+      setSidebarOpen(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      console.log("PatientLayout: Logging out user");
+      await logout();
+      toast.success("You have been logged out successfully");
+      // Navigate to login page
+      navigate("/login");
+    } catch (error) {
+      console.error("Logout error:", error);
+      toast.error("An error occurred during logout");
+      // Still try to navigate to login page
+      navigate("/login");
+    }
   };
 
   const navItems = [
     { 
       title: "Dashboard", 
       path: "/patient-dashboard", 
-      icon: <Home className="w-5 h-5" /> 
+      icon: <Home className="w-5 h-5" />,
+      exact: true
     },
     { 
       title: "Appointments", 
@@ -78,8 +115,8 @@ const PatientLayout = () => {
       icon: <CalendarDays className="w-5 h-5" /> 
     },
     { 
-      title: "Medical Reports", 
-      path: "/patient-dashboard/reports", 
+      title: "Medical Records", 
+      path: "/patient-dashboard/medical-records", 
       icon: <FileText className="w-5 h-5" /> 
     },
     { 
@@ -105,7 +142,8 @@ const PatientLayout = () => {
   ];
 
   const handleCreateAppointment = () => {
-    navigate("/appointments/new");
+    navigate("/patient-dashboard/new-appointment");
+    closeSidebarOnMobile();
   };
 
   const socialLinks = [
@@ -142,7 +180,7 @@ const PatientLayout = () => {
               className="p-2 rounded-full text-gray-500 hover:bg-gray-100 focus:outline-none lg:hidden"
               aria-label="Toggle sidebar"
             >
-              <Menu size={20} />
+              {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
             <div className="flex items-center ml-3 lg:ml-0">
               <img src={Logo} alt="Health Nest Logo" className="h-8 w-auto" />
@@ -178,12 +216,16 @@ const PatientLayout = () => {
               <button className="flex items-center space-x-1">
                 <div className="h-8 w-8 rounded-full overflow-hidden border-2 border-gray-200">
                   <img 
-                    src={userAvatar}
+                    src={userData.avatar}
                     alt="User Avatar" 
                     className="h-full w-full object-cover"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = "https://ui-avatars.com/api/?name=" + encodeURIComponent(userData.name);
+                    }}
                   />
                 </div>
-                <span className="text-sm font-medium text-gray-700 hidden md:block">{userName}</span>
+                <span className="text-sm font-medium text-gray-700 hidden md:block">{userData.name}</span>
               </button>
             </div>
           </div>
@@ -212,7 +254,7 @@ const PatientLayout = () => {
             width: sidebarOpen ? "250px" : "0px",
             opacity: sidebarOpen ? 1 : 0
           }}
-          className={`fixed bottom-0 left-0 z-30 bg-white border-r border-gray-200 shadow-lg overflow-y-auto lg:relative lg:translate-x-0`}
+          className="fixed top-16 bottom-0 left-0 z-30 bg-white border-r border-gray-200 shadow-lg overflow-y-auto lg:translate-x-0 h-[calc(100vh-4rem)]"
           transition={{ duration: 0.3, ease: "easeInOut" }}
         >
           {sidebarOpen && (
@@ -222,19 +264,26 @@ const PatientLayout = () => {
                 <div className="flex items-center space-x-3">
                   <div className="h-10 w-10 rounded-full overflow-hidden border-2 border-blue-100">
                     <img 
-                      src={userAvatar}
+                      src={userData.avatar}
                       alt="User Avatar" 
                       className="h-full w-full object-cover"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = "https://ui-avatars.com/api/?name=" + encodeURIComponent(userData.name);
+                      }}
                     />
                   </div>
-                  <div>
-                    <h2 className="text-base font-semibold text-gray-800">{userName}</h2>
-                    <p className="text-xs text-gray-500">Patient</p>
+                  <div className="overflow-hidden">
+                    <h2 className="text-base font-semibold text-gray-800 truncate">{userData.name}</h2>
+                    <p className="text-xs text-gray-500 truncate">{userData.email || "Patient"}</p>
                   </div>
                 </div>
                 <div className="mt-3 flex space-x-2">
                   <button 
-                    onClick={() => navigate("/patient-dashboard/profile")}
+                    onClick={() => {
+                      navigate("/patient-dashboard/profile");
+                      closeSidebarOnMobile();
+                    }}
                     className="flex-1 py-1.5 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-medium rounded-md transition"
                   >
                     View Profile
@@ -244,124 +293,55 @@ const PatientLayout = () => {
                   </button>
                 </div>
               </div>
-              
+
               {/* Navigation */}
-              <div className="py-3 flex-1">
-                <h3 className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                  Main Navigation
-                </h3>
-                <nav className="space-y-0.5">
-                  {navItems.map((item, index) => (
-                    <NavLink 
-                      key={index}
-                      to={item.path}
-                      className={({ isActive }) => 
-                        `flex items-center px-4 py-2 text-sm font-medium transition-all ${
-                          isActive 
-                            ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                            : 'text-gray-700 hover:bg-gray-100'
-                        }`
-                      }
-                      end={item.path === "/patient-dashboard"}
-                    >
-                      <span className={`p-1 rounded-md mr-3 ${
-                        location.pathname === item.path || 
-                        (item.path === "/patient-dashboard" && location.pathname === "/patient-dashboard") 
-                          ? 'bg-blue-500 text-white' 
-                          : 'bg-gray-100 text-gray-500'
-                      }`}>
-                        {item.icon}
-                      </span>
-                      <span>{item.title}</span>
-                      {location.pathname === item.path && (
-                        <ChevronRight className="ml-auto h-4 w-4" />
-                      )}
-                    </NavLink>
-                  ))}
-                </nav>
-              </div>
-              
-              {/* Quick Actions */}
-              <div className="px-4 py-3 border-t border-gray-100">
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                  Quick Actions
-                </h3>
-                <button
-                  onClick={handleCreateAppointment}
-                  className="w-full px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-all duration-300 flex items-center justify-center gap-2 text-sm"
-                >
-                  <PlusCircle size={16} />
-                  <span>New Appointment</span>
-                </button>
+              <nav className="flex-1 px-2 py-4 space-y-1">
+                {navItems.map(item => (
+                  <NavLink 
+                    key={item.path} 
+                    to={item.path}
+                    end={item.exact}
+                    onClick={closeSidebarOnMobile}
+                    className={({ isActive }) => `flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                      isActive 
+                        ? "bg-blue-50 text-blue-700" 
+                        : "text-gray-700 hover:bg-gray-100"
+                    }`}
+                  >
+                    <span className="mr-3">{item.icon}</span>
+                    {item.title}
+                  </NavLink>
+                ))}
                 
                 <button 
-                  onClick={handleLogout}
-                  className="mt-2 w-full px-3 py-2 border border-red-200 text-red-600 rounded-md hover:bg-red-50 transition-all duration-300 flex items-center justify-center gap-2 text-sm"
+                  onClick={handleCreateAppointment}
+                  className="w-full flex items-center px-3 py-2 mt-4 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition"
                 >
-                  <LogOut size={16} />
-                  <span>Logout</span>
+                  <PlusCircle className="w-5 h-5 mr-3" />
+                  New Appointment
                 </button>
-              </div>
-              
-              {/* Footer */}
-              <div className="px-4 py-3 bg-gray-50 mt-auto">
-                <p className="text-xs text-gray-500 mb-2">Health Nest • Patient Portal</p>
-                <div className="flex space-x-2">
-                  {socialLinks.map((link, index) => (
-                    <a 
-                      key={index}
-                      href={link.href} 
-                      className="text-gray-400 hover:text-gray-600 transition-colors"
-                      aria-label="Social media link"
-                    >
-                      {link.icon}
-                    </a>
-                  ))}
-                </div>
+              </nav>
+
+              {/* Logout Button */}
+              <div className="p-4 border-t border-gray-200">
+                <button 
+                  onClick={handleLogout}
+                  className="flex items-center px-3 py-2 w-full text-sm font-medium text-red-600 rounded-md hover:bg-red-50 transition"
+                >
+                  <LogOut className="w-5 h-5 mr-3" />
+                  Logout
+                </button>
               </div>
             </div>
           )}
         </motion.aside>
 
         {/* Main Content */}
-        <motion.main 
-          className="flex-1 overflow-y-auto"
-          initial={false}
-          animate={{ 
-            marginLeft: sidebarOpen && window.innerWidth >= 1024 ? "0" : "0" 
-          }}
-          transition={{ duration: 0.3 }}
-        >
-          {/* Dashboard Header */}
-          <div className="bg-white border-b border-gray-200 p-6">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-              <div className="mb-4 md:mb-0">
-                <h1 className="text-2xl font-bold text-gray-800">
-                  {navItems.find(item => location.pathname === item.path || 
-                    (item.path === "/patient-dashboard" && location.pathname === "/patient-dashboard"))?.title || "Dashboard"}
-                </h1>
-                <p className="text-gray-500 text-sm">
-                  {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                </p>
-              </div>
-              
-              <div className="flex items-center space-x-3">
-                <button
-                  onClick={handleCreateAppointment}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-300 flex items-center gap-2 shadow-sm text-sm"
-                >
-                  <PlusCircle size={16} />
-                  <span>New Appointment</span>
-                </button>
-              </div>
-            </div>
+        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-4 md:p-6">
+          <div className="max-w-7xl mx-auto">
+            {children || <Outlet />}
           </div>
-          
-          {/* Page Content */}
-          <div className="p-6">
-            <Outlet />
-          </div>
-        </motion.main>
+        </main>
       </div>
     </div>
   );
