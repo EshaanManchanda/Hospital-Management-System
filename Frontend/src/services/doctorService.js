@@ -17,20 +17,54 @@ const doctorService = {
       
       console.log("Doctor API response:", response.data);
       
-      // Ensure consistent response structure
-      if (response.data && response.data.success) {
-        return {
-          success: true,
-          doctors: response.data.data || [],
-          totalDoctors: response.data.count || 0
-        };
-      } else {
-        // If API returns error response, throw error to be caught
-        throw new Error(response.data?.message || 'Failed to fetch doctors');
+      // Safely extract data with fallbacks
+      const responseData = response?.data || {};
+      
+      // Handle all possible response structures
+      let doctors = [];
+      let count = 0;
+      let success = true;
+      
+      // Case 1: Standard API response with success flag
+      if (typeof responseData.success === 'boolean' && responseData.success === true) {
+        doctors = responseData.data || [];
+        count = responseData.count || doctors.length;
       }
+      // Case 2: Direct array of doctors
+      else if (Array.isArray(responseData)) {
+        doctors = responseData;
+        count = responseData.length;
+      }
+      // Case 3: Data property containing array
+      else if (responseData.data && Array.isArray(responseData.data)) {
+        doctors = responseData.data;
+        count = responseData.count || doctors.length;
+      }
+      // Case 4: Unknown structure but has doctors property
+      else if (responseData.doctors && Array.isArray(responseData.doctors)) {
+        doctors = responseData.doctors;
+        count = responseData.totalDoctors || doctors.length;
+      }
+      // If none of the above, consider it an error
+      else {
+        throw new Error('Invalid API response format');
+      }
+      
+      // Return standardized response
+      return {
+        success: true,
+        doctors: doctors,
+        totalDoctors: count
+      };
     } catch (error) {
       console.error('Get doctors error:', error);
-      throw error;
+      // Return error in a way that won't cause "is not a function" errors
+      return {
+        success: false,
+        doctors: [],
+        totalDoctors: 0,
+        message: error.message || 'Failed to fetch doctors'
+      };
     }
   },
   

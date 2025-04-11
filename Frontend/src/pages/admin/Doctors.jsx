@@ -3,6 +3,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger 
 } from "@/components/admin/ui/dropdown-menu";
 import { Button } from "@/components/admin/ui/button";
@@ -13,7 +14,7 @@ import {
   CardFooter
 } from "@/components/admin/ui/card";
 import { Badge } from "@/components/admin/ui/badge";
-import { Search, Filter, ChevronDown, Plus, Edit, Eye, User, Link, XCircle, Mail, Phone, MoreHorizontal } from "lucide-react";
+import { Search, Filter, ChevronDown, Plus, Edit, Eye, Link, XCircle, Mail, Phone, MoreHorizontal, Pencil, Trash, AlertCircle } from "lucide-react";
 import { useToast } from "@/components/admin/ui/use-toast";
 import { Skeleton } from "@/components/admin/ui/skeleton";
 import DoctorFormDialog from "@/components/dialogs/DoctorFormDialog";
@@ -97,14 +98,30 @@ const Doctors = () => {
     setIsLoading(true);
     try {
       const response = await doctorService.getAllDoctors();
-      if (response.success) {
+      
+      // Handle the response regardless of success status
+      if (response && response.doctors) {
         setDoctors(response.doctors);
+        
         // Extract unique specialties for filtering
-        const uniqueSpecialties = [...new Set(response.doctors.map(doctor => doctor.specialization))];
-        setSpecialties(uniqueSpecialties);
-        toast.success('Doctors loaded successfully');
+        const specialtySet = new Set();
+        specialtySet.add("All Specializations");
+        
+        // Add specialties if available
+        response.doctors.forEach(doctor => {
+          if (doctor && doctor.specialization) {
+            specialtySet.add(doctor.specialization);
+          }
+        });
+        
+        // Convert set to array
+        setSpecialties(Array.from(specialtySet));
+        
+        if (response.success) {
+          toast.success('Doctors loaded successfully');
+        }
       } else {
-        toast.error('Failed to load doctors');
+        toast.error('Failed to load doctors: ' + (response.message || 'Unknown error'));
       }
     } catch (error) {
       console.error('Error fetching doctors:', error);
@@ -356,8 +373,10 @@ const Doctors = () => {
 
     if (filteredDoctors.length === 0) {
       return (
-        <div className="text-center py-12">
-          <UserX className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+        <div className="text-center py-12 border border-dashed rounded-lg p-8">
+          <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-muted mb-4">
+            <AlertCircle className="h-6 w-6 text-muted-foreground" />
+          </div>
           <h3 className="text-lg font-medium mb-2">No doctors found</h3>
           <p className="text-muted-foreground">Try adjusting your search or filters.</p>
         </div>
@@ -480,8 +499,10 @@ const Doctors = () => {
 
     if (filteredDoctors.length === 0) {
       return (
-        <div className="text-center py-12">
-          <UserX className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+        <div className="text-center py-12 border border-dashed rounded-lg p-8">
+          <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-muted mb-4">
+            <AlertCircle className="h-6 w-6 text-muted-foreground" />
+          </div>
           <h3 className="text-lg font-medium mb-2">No doctors found</h3>
           <p className="text-muted-foreground">Try adjusting your search or filters.</p>
         </div>
