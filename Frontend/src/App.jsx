@@ -20,6 +20,7 @@ import { GoogleAuthProvider } from "./contexts/GoogleAuthContext";
 import { ErrorBoundary } from 'react-error-boundary';
 import { Toaster as ReactHotToastToaster } from 'react-hot-toast';
 import { Provider } from 'react-redux';
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import store from './store';
 import { toast } from 'react-hot-toast';
 import ProtectedRoute from "./components/shared/ProtectedRoute";
@@ -279,6 +280,7 @@ const App = () => {
                   <AuthContent />
                 </Suspense>
               </Router>
+              <SpeedInsights />
             </TooltipProvider>
           </ThemeProvider>
         </QueryClientProvider>

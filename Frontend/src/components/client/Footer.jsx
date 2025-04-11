@@ -9,10 +9,10 @@ const Footer = () => {
   const [emailInput, setEmailInput] = useState('');
 
   const socialLinks = [
-    { icon: FaTwitter, href: 'https://x.com/YazdanH7', color: 'bg-[#1DA1F2]', hoverColor: 'bg-white text-[#1DA1F2]' },
-    { icon: FaFacebookF, href: 'https://www.facebook.com/yazdan.yazdankhan.7/', color: 'bg-[#1877F2]', hoverColor: 'bg-white text-[#1877F2]' },
-    { icon: FaInstagram, href: 'https://www.instagram.com/yazdan.haider23/', color: 'bg-gradient-to-r from-[#F58529] via-[#DD2A7B] to-[#8134AF]', hoverColor: 'bg-white text-[#DD2A7B]' },
-    { icon: FaLinkedinIn, href: 'https://www.linkedin.com/in/yazdan-haider', color: 'bg-[#0A66C2]', hoverColor: 'bg-white text-[#0A66C2]' },
+    { icon: FaTwitter, href: 'https://x.com/EshaanManchanda', color: 'bg-[#1DA1F2]', hoverColor: 'bg-white text-[#1DA1F2]' },
+    { icon: FaFacebookF, href: 'https://www.facebook.com/eshaan.official2002/', color: 'bg-[#1877F2]', hoverColor: 'bg-white text-[#1877F2]' },
+    { icon: FaInstagram, href: 'https://www.instagram.com/eshaan.official2002/', color: 'bg-gradient-to-r from-[#F58529] via-[#DD2A7B] to-[#8134AF]', hoverColor: 'bg-white text-[#DD2A7B]' },
+    { icon: FaLinkedinIn, href: 'https://www.linkedin.com/in/eshaan-manchanda/', color: 'bg-[#0A66C2]', hoverColor: 'bg-white text-[#0A66C2]' },
   ];
 
   const footerLinks = [
