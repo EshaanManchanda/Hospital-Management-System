@@ -436,17 +436,35 @@ const handleGoogleCallback = async (token, password) => {
         headers: { Authorization: `Bearer ${token}` },
       });
       
-      if (patientResponse.data && patientResponse.data.success && patientResponse.data.patient) {
+      if (patientResponse.data && patientResponse.data.success) {
         console.log('Found existing patient profile:', patientResponse.data.patient._id);
         
         // Store user data with patient ID
+        
+        const patientId = 
+            patientResponse.data.patient?._id || 
+            patientResponse.data.patient?.id || 
+            patientResponse.data?._id ||
+            patientResponse.data?.id ||
+            patientResponse.data.data?._id ||
+            patientResponse.data.data?.id;
+          
+          if (!patientId) {
+            console.error('Failed to extract patient ID from response:', {
+              responseData: patientResponse.data,
+              possibleLocations: ['data.patient._id', 'data.patient.id', 'data._id', 'data.id', 'data.data._id', 'data.data.id']
+            });
+            throw new Error('Patient ID not found in expected response locations');
+          }
+        
+        
         const userData = {
           userId: verifyResponse.data.user.id || verifyResponse.data.user._id,
           name: verifyResponse.data.user.name,
           email: verifyResponse.data.user.email,
           role: 'patient',
           picture: verifyResponse.data.user.picture,
-          patientId: patientResponse.data.patient._id
+          patientId: patientId
         };
         
         localStorage.setItem('userData', JSON.stringify(userData));
@@ -485,24 +503,70 @@ const handleGoogleCallback = async (token, password) => {
           relationship: ''
         }
       };
+      
+      // Log patient creation data for debugging
+      console.log('Creating patient profile with data:', JSON.stringify(createPatientData, null, 2));
     
       // Create patient profile
       const patientResponse = await api.post('/api/patients', createPatientData, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      
+      // Format response to match expected structure
+      if (patientResponse.data && patientResponse.data.success) {
+        const formattedResponse = {
+          success: true,
+          data: {
+            user: verifyResponse.data.user.id || verifyResponse.data.user._id,
+            bloodGroup: patientResponse.data.data?.bloodGroup || '',
+            height: patientResponse.data.data?.height || 0,
+            weight: patientResponse.data.data?.weight || 0,
+            allergies: patientResponse.data.data?.allergies || [],
+            chronicDiseases: patientResponse.data.data?.chronicDiseases || [],
+            emergencyContact: patientResponse.data.data?.emergencyContact || {},
+            appointments: patientResponse.data.data?.appointments || [],
+            reports: patientResponse.data.data?.reports || [],
+            insuranceDetails: patientResponse.data.data?.insuranceDetails || {},
+            notes: patientResponse.data.data?.notes || '',
+            isActive: patientResponse.data.data?.isActive || true,
+            status: patientResponse.data.data?.status || 'Active',
+            _id: patientResponse.data.data?._id || patientResponse.data.data?.id,
+            medicalHistory: patientResponse.data.data?.medicalHistory || [],
+            medications: patientResponse.data.data?.medications || [],
+            createdAt: patientResponse.data.data?.createdAt || new Date().toISOString(),
+            updatedAt: patientResponse.data.data?.updatedAt || new Date().toISOString(),
+            __v: patientResponse.data.data?.__v || 0
+          }
+        };
+        patientResponse.data = formattedResponse;
+      }
     
       if (patientResponse.data && patientResponse.data.success) {
-        // Extract patient ID, ensuring we check all possible locations
-        const patientId = 
-          patientResponse.data.patient?._id || 
-          patientResponse.data.patient?.id || 
-          patientResponse.data._id ||
-          patientResponse.data.id;
-        
-        if (!patientId) {
-          console.error('Failed to extract patient ID from response:', patientResponse.data);
-        } else {
+        // Extract patient ID with detailed error handling
+        let patientId;
+        try {
+          patientId = 
+            patientResponse.data.patient?._id || 
+            patientResponse.data.patient?.id || 
+            patientResponse.data._id ||
+            patientResponse.data.id;
+          
+          if (!patientId) {
+            console.error('Failed to extract patient ID from response:', {
+              responseData: patientResponse.data,
+              possibleLocations: ['data.patient._id', 'data.patient.id', 'data._id', 'data.id']
+            });
+            throw new Error('Patient ID not found in expected response locations');
+          }
+          
           console.log('Successfully extracted patient ID:', patientId);
+        } catch (idError) {
+          console.error('Critical error extracting patient ID:', {
+            error: idError,
+            responseData: patientResponse.data,
+            stack: idError.stack
+          });
+          throw new Error('Failed to process patient registration - missing ID');
         }
         
         // Update userData to include patientId from response
