@@ -5,25 +5,15 @@ import { Patient } from "../models/Patient.js";
 export const getAllMedicalRecords = async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
-    
-    // Calculate pagination values
     const skip = (parseInt(page) - 1) * parseInt(limit);
     
-    // Get medical records with pagination
     const medicalRecords = await MedicalRecord.find()
-      .populate({
-        path: 'patient',
-        select: 'name contactNumber email'
-      })
-      .populate({
-        path: 'doctor',
-        select: 'name specialization contactNumber email'
-      })
-      .sort({ date: -1 })
+      .populate('patient', 'name contactNumber email')
+      .populate('doctor', 'name specialization')
+      .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
     
-    // Get total count for pagination
     const total = await MedicalRecord.countDocuments();
     
     res.status(200).json({
@@ -51,14 +41,8 @@ export const getAllMedicalRecords = async (req, res) => {
 export const getMedicalRecordById = async (req, res) => {
   try {
     const medicalRecord = await MedicalRecord.findById(req.params.id)
-      .populate({
-        path: 'patient',
-        select: 'name contactNumber email address dateOfBirth gender bloodGroup'
-      })
-      .populate({
-        path: 'doctor',
-        select: 'name specialization contactNumber email'
-      });
+      .populate('patient', 'name contactNumber email address dateOfBirth gender bloodGroup')
+      .populate('doctor', 'name specialization');
     
     if (!medicalRecord) {
       return res.status(404).json({
@@ -67,12 +51,8 @@ export const getMedicalRecordById = async (req, res) => {
       });
     }
     
-    // Check authorization
-    if (
-      req.user.role !== 'admin' && 
-      req.user.role !== 'doctor' && 
-      medicalRecord.patient._id.toString() !== req.user._id.toString()
-    ) {
+    // Simplified authorization check
+    if (req.user.role === 'patient' && medicalRecord.patient._id.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to view this medical record'
@@ -98,33 +78,22 @@ export const getPatientMedicalRecords = async (req, res) => {
   try {
     const { patientId } = req.params;
     const { page = 1, limit = 10 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
     
-    // Check if user is authorized to view patient's medical records
-    if (
-      req.user.role !== 'admin' && 
-      req.user.role !== 'doctor' && 
-      patientId !== req.user._id.toString()
-    ) {
+    // Simplified authorization check
+    if (req.user.role === 'patient' && patientId !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to view these medical records'
       });
     }
     
-    // Calculate pagination values
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    
-    // Get medical records with pagination
     const medicalRecords = await MedicalRecord.find({ patient: patientId })
-      .populate({
-        path: 'doctor',
-        select: 'name specialization contactNumber email'
-      })
-      .sort({ date: -1 })
+      .populate('doctor', 'name specialization')
+      .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
     
-    // Get total count for pagination
     const total = await MedicalRecord.countDocuments({ patient: patientId });
     
     res.status(200).json({
@@ -153,33 +122,22 @@ export const getDoctorMedicalRecords = async (req, res) => {
   try {
     const { doctorId } = req.params;
     const { page = 1, limit = 10 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
     
-    // Check if user is authorized to view doctor's medical records
-    if (
-      req.user.role !== 'admin' && 
-      req.user.role !== 'doctor' && 
-      doctorId !== req.user._id.toString()
-    ) {
+    // Simplified authorization check
+    if (req.user.role === 'doctor' && doctorId !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to view these medical records'
       });
     }
     
-    // Calculate pagination values
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    
-    // Get medical records with pagination
     const medicalRecords = await MedicalRecord.find({ doctor: doctorId })
-      .populate({
-        path: 'patient',
-        select: 'name contactNumber email address dateOfBirth gender bloodGroup'
-      })
-      .sort({ date: -1 })
+      .populate('patient', 'name contactNumber email')
+      .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
     
-    // Get total count for pagination
     const total = await MedicalRecord.countDocuments({ doctor: doctorId });
     
     res.status(200).json({
@@ -214,9 +172,18 @@ export const createMedicalRecord = async (req, res) => {
       notes,
       attachments,
       vitalSigns,
-      followUpDate
+      followUpDate,
+      status
     } = req.body;
     
+    // Validate required fields
+    if (!patient || !diagnosis || !treatment) {
+      return res.status(400).json({
+        success: false,
+        message: 'Patient, diagnosis, and treatment are required fields'
+      });
+    }
+
     // Check if patient exists
     const patientExists = await Patient.findById(patient);
     if (!patientExists) {
@@ -226,20 +193,29 @@ export const createMedicalRecord = async (req, res) => {
       });
     }
     
-    // Create new medical record
+    // Create new medical record with proper schema fields
     const medicalRecord = await MedicalRecord.create({
       patient,
       doctor: doctor || req.user._id,
       diagnosis,
       treatment,
-      notes,
+      notes: notes || '',
       attachments: attachments || [],
-      vitalSigns: vitalSigns || {},
-      followUpDate,
-      date: new Date()
+      vitalSigns: vitalSigns || {
+        temperature: null,
+        heartRate: null,
+        bloodPressure: '',
+        respiratoryRate: null,
+        oxygenSaturation: null,
+        height: null,
+        weight: null
+      },
+      date: new Date(),
+      followUpDate: followUpDate || null,
+      status: status || 'open'
     });
     
-    // Populate the response
+    // Populate the response with required fields
     const populatedMedicalRecord = await MedicalRecord.findById(medicalRecord._id)
       .populate({
         path: 'patient',
@@ -252,13 +228,14 @@ export const createMedicalRecord = async (req, res) => {
     
     res.status(201).json({
       success: true,
-      data: populatedMedicalRecord
+      data: populatedMedicalRecord,
+      message: 'Medical record created successfully'
     });
   } catch (error) {
     console.error('Error creating medical record:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error',
+      message: 'Server error while creating medical record',
       error: error.message
     });
   }
@@ -467,4 +444,4 @@ export const addAttachment = async (req, res) => {
       error: error.message
     });
   }
-}; 
+};

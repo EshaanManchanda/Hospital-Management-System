@@ -24,6 +24,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { FaTwitter, FaFacebookF, FaInstagram, FaLinkedinIn } from 'react-icons/fa';
 import Logo from '@/assets/logo.svg';
 import { toast } from "react-hot-toast";
+import NewAppointmentDialog from "../components/dialogs/NewAppointmentDialog";
 
 const PatientLayout = ({ children }) => {
   const navigate = useNavigate();
@@ -32,6 +33,7 @@ const PatientLayout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [notificationsCount, setNotificationsCount] = useState(3);
+  const [showNewAppointmentDialog, setShowNewAppointmentDialog] = useState(false);
   const [userData, setUserData] = useState({
     name: "Patient",
     email: "",
@@ -142,7 +144,8 @@ const PatientLayout = ({ children }) => {
   ];
 
   const handleCreateAppointment = () => {
-    navigate("/patient-dashboard/new-appointment");
+    // Show the dialog directly instead of navigating
+    setShowNewAppointmentDialog(true);
     closeSidebarOnMobile();
   };
 
@@ -337,14 +340,20 @@ const PatientLayout = ({ children }) => {
         </motion.aside>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-4 md:p-6">
+        <main className={`flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-4 md:p-6 ${sidebarOpen ? 'ml-[250px]' : ''}`}>
           <div className="max-w-7xl mx-auto">
             {children || <Outlet />}
           </div>
         </main>
       </div>
+
+      {/* New Appointment Dialog */}
+      <NewAppointmentDialog 
+        open={showNewAppointmentDialog} 
+        onOpenChange={setShowNewAppointmentDialog} 
+      />
     </div>
   );
 };
 
-export default PatientLayout; 
+export default PatientLayout;

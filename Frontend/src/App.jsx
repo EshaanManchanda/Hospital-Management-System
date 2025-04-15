@@ -53,7 +53,6 @@ import DoctorProfile from "./pages/doctor/DoctorProfile";
 import PatientLayout from "./layouts/PatientLayout";
 import Appointments from "./pages/patient/Appointments";
 import MedicalReports from "./pages/patient/MedicalReports";
-import NewAppointment from "./pages/patient/NewAppointment";
 import PatientBeds from "./pages/patient/PatientBeds";
 import PatientMedications from "./pages/patient/PatientMedications";
 import PatientPrescriptions from "./pages/patient/PatientPrescriptions";
@@ -191,7 +190,6 @@ const AppContent = () => {
                       <Route path="/" element={<PatientDashboard />} />
                       <Route path="appointments" element={<Appointments />} />
                       <Route path="medical-records" element={<MedicalReports />} />
-                      <Route path="new-appointment" element={<NewAppointment />} />
                       <Route path="beds" element={<PatientBeds />} />
                       <Route path="medications" element={<PatientMedications />} />
                       <Route path="prescriptions" element={<PatientPrescriptions />} />

@@ -33,7 +33,6 @@ const PrivacyPolicy = lazy(() => import("./pages/client/PrivacyPolicy"));
 const PatientDashboard = lazy(() => import("./pages/patient/PatientDashboard"));
 const PatientProfile = lazy(() => import("./pages/patient/PatientProfile"));
 const MedicalReports = lazy(() => import("./pages/patient/MedicalReports"));
-const NewAppointment = lazy(() => import("./pages/patient/NewAppointment"));
 
 // Lazy load client pages
 const ClientDoctors = lazy(() => import("./pages/client/Doctors"));
@@ -177,13 +176,6 @@ function App() {
                       <Route path="/dashboard" element={<DashboardRedirect />} />
                       <Route path="/admin" element={<Navigate to="/admin-dashboard" replace />} />
                       <Route path="/doctor" element={<Navigate to="/doctor-dashboard" replace />} />
-                      
-                      {/* New Appointment Route */}
-                      <Route path="/appointments/new" element={
-                        <ProtectedRoute allowedRoles={['patient']}>
-                          <NewAppointment />
-                        </ProtectedRoute>
-                      } />
                       
                       {/* Patient Dashboard Routes */}
                       <Route path="/patient-dashboard/*" element={

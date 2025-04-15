@@ -10,15 +10,15 @@ const patientSchema = new mongoose.Schema({
   bloodGroup: {
     type: String,
     enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'],
-    required: true
+    default: 'O+'
   },
   height: {
     type: Number,  // in cm
-    required: true
+    default: 170
   },
   weight: {
     type: Number,  // in kg
-    required: true
+    default: 70
   },
   allergies: [{
     type: String
@@ -75,9 +75,18 @@ const patientSchema = new mongoose.Schema({
     validUntil: Date,
     coverageDetails: String
   },
+  notes: {
+    type: String,
+    default: ''
+  },
   isActive: {
     type: Boolean,
     default: true
+  },
+  status: {
+    type: String,
+    enum: ['Active', 'Inactive', 'Blocked'],
+    default: 'Active'
   }
 }, { timestamps: true });
 

@@ -7,9 +7,7 @@ import api from '../../utils/api';
 import { FaUser, FaWeight, FaRulerVertical, FaTint } from 'react-icons/fa';
 import { AuthContext } from "../../contexts/AuthContext";
 import { Skeleton } from "../../components/admin/ui/skeleton";
-
-// Define patientService at module level
-let patientService;
+import { patientService } from '../../services/patientService'; // Add this import
 
 const PatientProfile = () => {
   const { user, loading: authLoading } = useContext(AuthContext);
@@ -43,111 +41,77 @@ const PatientProfile = () => {
   console.log("PatientProfile - userData:", userData);
   console.log("PatientProfile - patientId:", userData?.patientId);
 
-  const fetchPatientData = async () => {
-    // Debug logs to identify the issue
-    console.log("fetchPatientData - Starting to fetch with patientId:", userData?.patientId);
+const fetchPatientData = async () => {
+  console.log("fetchPatientData - Starting to fetch with patientId:", userData?.patientId);
+  
+  try {
+    setLoading(true);
     
-    try {
-      setLoading(true);
+    // Get patient ID from either userData or localStorage
+    const patientId = userData?.patientId || authService.getUserData()?.patientId;
+    
+    if (!patientId) {
+      console.error("No patientId found");
+      setError("Patient profile not found. Please ensure you're logged in as a patient.");
       
-      // Check if we have a patient ID from user data
-      if (!userData?.patientId) {
-        console.log("No patientId found in userData, checking localStorage directly");
-        
-        // Try to get patient ID from localStorage as a fallback
-        const storedUserData = authService.getUserData();
-        
-        if (!storedUserData?.patientId) {
-          console.error("No patientId found in localStorage either");
-          
-          // No patient ID found, show a message to the user
-          setError("Patient profile not found. Please ensure you're logged in as a patient.");
-          setLoading(false);
-          
-          // Show empty profile in edit mode if in setup mode
-          if (isSetupMode) {
-            console.log("Setup mode detected, showing empty profile form");
-            setProfile({});
-            setEditing(true);
-          }
-          return;
-        } else {
-          console.log("Found patientId in localStorage:", storedUserData.patientId);
-        }
+      if (isSetupMode) {
+        console.log("Setup mode detected, showing empty profile form");
+        setProfile({});
+        setEditing(true);
       }
-      
-      // Load patientService dynamically
-      if (!patientService) {
-        console.log("Loading patientService dynamically");
-        try {
-          const module = await import('../../services/patientService');
-          patientService = module.default;
-        } catch (importError) {
-          console.error("Error importing patientService:", importError);
-          setError("Failed to load patient service. Please refresh the page.");
-          setLoading(false);
-          return;
-        }
-      }
-      
-      const patientId = userData?.patientId || authService.getUserData()?.patientId;
-      console.log("Fetching patient data with ID:", patientId);
-      
-      try {
-        const response = await patientService.getPatientById(patientId);
-        console.log("Patient data response:", response);
-        
-        if (response.success) {
-          setProfile(response.patient);
-          setFormData({
-            name: response.patient.user?.name || "",
-            email: response.patient.user?.email || "",
-            phone: response.patient.contactNumber || "",
-            address: response.patient.address || "",
-            birthdate: response.patient.dateOfBirth ? new Date(response.patient.dateOfBirth).toISOString().split('T')[0] : "",
-            gender: response.patient.gender || "",
-            bloodGroup: response.patient.bloodGroup || "",
-            height: response.patient.height || "",
-            weight: response.patient.weight || "",
-            allergies: response.patient.allergies?.join(", ") || "",
-            chronicDiseases: response.patient.chronicDiseases?.join(", ") || ""
-          });
-          
-          // If in setup mode, automatically go into editing mode
-          if (isSetupMode) {
-            setEditing(true);
-            toast.info('Please complete your profile information. Required fields are marked with *', { duration: 5000 });
-          }
-        } else {
-          console.error("API returned error:", response.message);
-          if (isSetupMode) {
-            // In setup mode, still show the form
-            setProfile({});
-            setEditing(true);
-          } else {
-            setError(response.message || "Failed to load profile data");
-          }
-        }
-      } catch (apiError) {
-        console.error("API call error:", apiError);
-        
-        if (isSetupMode) {
-          // In setup mode, still show the form despite errors
-          setProfile({});
-          setEditing(true);
-        } else {
-          setError("Error communicating with the server. Please try again later.");
-        }
-      }
-    } catch (error) {
-      console.error("Error in fetchPatientData:", error);
-      if (!isSetupMode) {
-        setError("An unexpected error occurred. Please refresh the page.");
-      }
-    } finally {
-      setLoading(false);
+      return;
     }
-  };
+
+    console.log("Fetching patient data with ID:", patientId);
+    
+    const response = await patientService.getPatientById(patientId);
+    console.log("Patient data response:", response);
+    
+    if (response.success) {
+      setProfile(response.patient);
+      setFormData({
+        name: response.patient.user?.name || "",
+        email: response.patient.user?.email || "",
+        phone: response.patient.user?.mobile || "",
+        address: `${response.patient.user?.address?.street || ""}, ${response.patient.user?.address?.city || ""}, ${response.patient.user?.address?.state || ""}, ${response.patient.user?.address?.zipCode || ""}, ${response.patient.user?.address?.country || ""}`,
+        birthdate: response.patient.user?.dateOfBirth ? new Date(response.patient.user.dateOfBirth).toISOString().split('T')[0] : "",
+        gender: response.patient.user?.gender || "",
+        bloodGroup: response.patient.bloodGroup || "",
+        height: response.patient.height || "",
+        weight: response.patient.weight || "",
+        allergies: response.patient.allergies?.join(", ") || "",
+        chronicDiseases: response.patient.chronicDiseases?.join(", ") || "",
+        emergencyContactName: response.patient.emergencyContact?.name || "",
+        emergencyContactPhone: response.patient.emergencyContact?.phone || "",
+        emergencyContactRelationship: response.patient.emergencyContact?.relationship || "",
+        notes: response.patient.notes || ""
+      });
+      
+      if (isSetupMode) {
+        setEditing(true);
+        toast.info('Please complete your profile information. Required fields are marked with *', { duration: 5000 });
+      }
+    } else {
+      if (isSetupMode) {
+        setProfile({});
+        setEditing(true);
+      } else {
+        setError(response.message || "Failed to load profile data");
+      }
+    }
+  } catch (error) {
+    console.error("Error in fetchPatientData:", error);
+    
+    if (isSetupMode) {
+      setProfile({});
+      setEditing(true);
+    } else {
+      setError("An unexpected error occurred. Please try again later.");
+    }
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
     if (authLoading) {
@@ -167,39 +131,92 @@ const PatientProfile = () => {
   const handleSave = async () => {
     try {
       setSaveLoading(true);
+  
       // Convert comma-separated strings to arrays
       const allergiesArray = formData.allergies ? formData.allergies.split(',').map(item => item.trim()) : [];
       const chronicDiseasesArray = formData.chronicDiseases ? formData.chronicDiseases.split(',').map(item => item.trim()) : [];
-      
-      // Create/update profile data
+  
+      // Prepare the updated patient data
       const profileData = {
+        user: {
+          name: formData.name,
+          email: formData.email,
+          mobile: formData.phone,
+          gender: formData.gender,
+          dateOfBirth: formData.birthdate,
+          address: {
+            street: formData.address.split(",")[0]?.trim() || "",
+            city: formData.address.split(",")[1]?.trim() || "",
+            state: formData.address.split(",")[2]?.trim() || "",
+            zipCode: formData.address.split(",")[3]?.trim() || "",
+            country: formData.address.split(",")[4]?.trim() || "",
+          }
+        },
         bloodGroup: formData.bloodGroup,
         height: parseInt(formData.height) || 0,
         weight: parseInt(formData.weight) || 0,
         allergies: allergiesArray,
-        chronicDiseases: chronicDiseasesArray
+        chronicDiseases: chronicDiseasesArray,
+        emergencyContact: {
+          name: formData.emergencyContactName || "",
+          phone: formData.emergencyContactPhone || "",
+          relationship: formData.emergencyContactRelationship || "",
+        },
+        notes: formData.notes || "",
       };
-      
+  
       let response;
       if (profile?._id) {
-        // Update existing profile
-        response = await api.put('/api/patients/profile', profileData);
-      } else {
-        // Create new profile
-        response = await api.post('/api/patients/profile', profileData);
-      }
-      
-      if (response.data.success) {
-        toast.success('Profile updated successfully');
-        setEditing(false);
-        fetchPatientData();
+        response = await patientService.updatePatient(profile._id, profileData);
         
-        // If this was the initial setup, redirect to the dashboard
-        if (isSetupMode) {
-          navigate('/patient-dashboard');
+        if (response.success) {
+          // Update the local profile state with the new data
+          setProfile(response.patient);
+          
+          // Update formData with the new values
+          setFormData({
+            name: response.patient.user?.name || "",
+            email: response.patient.user?.email || "",
+            phone: response.patient.user?.mobile || "",
+            address: response.patient.user?.address ? 
+              `${response.patient.user.address.street}, ${response.patient.user.address.city}, ${response.patient.user.address.state}, ${response.patient.user.address.zipCode}, ${response.patient.user.address.country}`
+              : "",
+            birthdate: response.patient.user?.dateOfBirth ? 
+              new Date(response.patient.user.dateOfBirth).toISOString().split('T')[0] 
+              : "",
+            gender: response.patient.user?.gender || "",
+            bloodGroup: response.patient.bloodGroup || "",
+            height: response.patient.height || "",
+            weight: response.patient.weight || "",
+            allergies: response.patient.allergies?.join(", ") || "",
+            chronicDiseases: response.patient.chronicDiseases?.join(", ") || "",
+            emergencyContactName: response.patient.emergencyContact?.name || "",
+            emergencyContactPhone: response.patient.emergencyContact?.phone || "",
+            emergencyContactRelationship: response.patient.emergencyContact?.relationship || "",
+            notes: response.patient.notes || ""
+          });
+  
+          toast.success('Profile updated successfully');
+          setEditing(false);
+  
+          // If this was the initial setup, redirect to the dashboard
+          if (isSetupMode) {
+            navigate('/patient-dashboard');
+          }
+        } else {
+          toast.error(response.message || 'Failed to update profile');
         }
       } else {
-        toast.error(response.data.message || 'Failed to update profile');
+        // Handle create new patient case
+        response = await patientService.createPatient(profileData);
+        if (response.success) {
+          setProfile(response.patient);
+          toast.success('Profile created successfully');
+          setEditing(false);
+          if (isSetupMode) {
+            navigate('/patient-dashboard');
+          }
+        }
       }
     } catch (err) {
       console.error('Error updating profile:', err);
@@ -208,6 +225,7 @@ const PatientProfile = () => {
       setSaveLoading(false);
     }
   };
+  
 
   const handleCancel = () => {
     // Reset form data to current profile values
@@ -215,10 +233,14 @@ const PatientProfile = () => {
       setFormData({
         name: profile.user?.name || "",
         email: profile.user?.email || "",
-        phone: profile.contactNumber || "",
-        address: profile.address || "",
-        birthdate: profile.dateOfBirth ? new Date(profile.dateOfBirth).toISOString().split('T')[0] : "",
-        gender: profile.gender || "",
+        phone: profile.user?.mobile || "",
+        address: profile.user?.address ? 
+          `${profile.user.address.street}, ${profile.user.address.city}, ${profile.user.address.state}, ${profile.user.address.zipCode}, ${profile.user.address.country}`
+          : "",
+        birthdate: profile.user?.dateOfBirth ? 
+          new Date(profile.user.dateOfBirth).toISOString().split('T')[0] 
+          : "",
+        gender: profile.user?.gender || "",
         bloodGroup: profile.bloodGroup || "",
         height: profile.height || "",
         weight: profile.weight || "",
@@ -343,29 +365,12 @@ const PatientProfile = () => {
                             placeholder="Enter phone number"
                           />
                         ) : (
-                          <p className="text-gray-800">{profile?.contactNumber || "Not provided"}</p>
+                          <p className="text-gray-800">{profile?.user?.mobile || "Not provided"}</p>
                         )}
                       </div>
                     </div>
                     
-                    <div className="flex items-start gap-3">
-                      <MapPin className="h-5 w-5 text-blue-500 mt-1" />
-                      <div className="flex-1">
-                        <p className="text-sm text-gray-500">Address</p>
-                        {editing ? (
-                          <textarea
-                            name="address"
-                            value={formData.address}
-                            onChange={handleChange}
-                            className="w-full border rounded-md p-2 mt-1"
-                            placeholder="Enter address"
-                            rows="3"
-                          />
-                        ) : (
-                          <p className="text-gray-800">{profile?.address || "Not provided"}</p>
-                        )}
-                      </div>
-                    </div>
+                    
                   </div>
                 </div>
               </div>
@@ -388,7 +393,7 @@ const PatientProfile = () => {
                       ) : (
                         <div className="flex items-center gap-2">
                           <Calendar className="h-5 w-5 text-blue-500" />
-                          <span className="text-gray-800">{profile?.dateOfBirth ? new Date(profile.dateOfBirth).toLocaleDateString() : "Not provided"}</span>
+                          <span className="text-gray-800"> {profile?.user?.dateOfBirth ? new Date(profile.user.dateOfBirth).toLocaleDateString() : "Not provided"}</span>
                         </div>
                       )}
                     </div>
@@ -408,7 +413,7 @@ const PatientProfile = () => {
                           <option value="Other">Other</option>
                         </select>
                       ) : (
-                        <p className="text-gray-800">{profile?.gender || "Not provided"}</p>
+                        <p className="text-gray-800">{profile?.user?.gender || "Not provided"}</p>
                       )}
                     </div>
                   </div>
@@ -570,4 +575,4 @@ const PatientProfile = () => {
   );
 };
 
-export default PatientProfile; 
+export default PatientProfile;

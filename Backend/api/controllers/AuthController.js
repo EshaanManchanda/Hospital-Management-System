@@ -34,53 +34,103 @@ const generateToken = (id) => {
 // Register a new user
 export const register = async (req, res) => {
   try {
-    const { name, email, password, role = 'patient', mobile, gender, dateOfBirth, address } = req.body;
+    const { 
+      name, 
+      email, 
+      password, 
+      role = 'patient', 
+      mobile, 
+      gender, 
+      dateOfBirth, 
+      address,
+      // Admin specific fields
+      adminLevel,
+      permissions,
+      department,
+      contactNumber,
+      office
+    } = req.body;
+
+    console.log(`Registration attempt for email: ${email}, role: ${role}`);
 
     // Check if user already exists
     const userExists = await User.findOne({ email });
     if (userExists) {
-      return res.status(400).json({ message: "User already exists" });
+      return res.status(400).json({ 
+        success: false,
+        message: "User already exists" 
+      });
     }
 
     // Validate role - ensure it's one of the allowed roles
     const validRoles = ['patient', 'doctor', 'admin', 'nurse', 'receptionist'];
     const userRole = validRoles.includes(role) ? role : 'patient';
 
+    console.log(`Creating user with role: ${userRole}`);
+
     // Create user with validated role
-    const user = await User.create({
+    const userData = {
       name,
       email,
       password,
-      role: userRole, // Use validated role
-      mobile,
-      gender,
-      dateOfBirth,
-      address
-    });
+      role: userRole
+    };
+    
+    // Add optional fields if present
+    if (mobile) {
+      // Format mobile number to ensure it only contains digits and optional + prefix
+      const formattedMobile = mobile.replace(/\D+/g, '');
+      userData.mobile = formattedMobile;
+    }
+    
+    if (gender) {
+      // Ensure gender is lowercase to match enum values
+      userData.gender = gender.toLowerCase();
+    }
+    
+    if (dateOfBirth) userData.dateOfBirth = dateOfBirth;
+    
+    // Handle address as an object with specific properties
+    if (address && typeof address === 'object') {
+      userData.address = {
+        street: address.street || '',
+        city: address.city || '',
+        state: address.state || '',
+        zipCode: address.zipCode || '',
+        country: address.country || ''
+      };
+    }
+
+    console.log('User data prepared for creation:', userData);
+
+    const user = await User.create(userData);
+
+    console.log(`User created with ID: ${user._id}`);
 
     // Create role-specific records
     let roleSpecificData = null;
 
-    if (userRole === 'doctor') {
-      // Import Doctor model dynamically
-      const { Doctor } = await import("../models/Doctor.js");
-      
-      // Create doctor record
-      const doctor = await Doctor.create({
-        user: user._id,
-        specialization: req.body.specialization || 'General Medicine',
-        experience: req.body.experience || 0,
-        fee: req.body.fee || 0,
-        about: req.body.about || `Dr. ${name} is a healthcare provider at our hospital.`,
-        workingHours: req.body.workingHours || { start: '09:00', end: '17:00' },
-        workingDays: req.body.workingDays || ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-      });
-      
-      roleSpecificData = { doctorId: doctor._id };
-    } 
-    else if (userRole === 'patient') {
-      // Import Patient model dynamically
-      try {
+    try {
+      if (userRole === 'doctor') {
+        // Import Doctor model dynamically
+        const { Doctor } = await import("../models/Doctor.js");
+        
+        // Create doctor record
+        const doctor = await Doctor.create({
+          user: user._id,
+          specialization: req.body.specialization || 'General Medicine',
+          experience: req.body.experience || 0,
+          fee: req.body.fee || 0,
+          about: req.body.about || `Dr. ${name} is a healthcare provider at our hospital.`,
+          workingHours: req.body.workingHours || { start: '09:00', end: '17:00' },
+          workingDays: req.body.workingDays || ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+        });
+        
+        console.log(`Doctor record created with ID: ${doctor._id}`);
+        roleSpecificData = { doctorId: doctor._id };
+      } 
+      else if (userRole === 'patient') {
+        // Import Patient model dynamically
         const { Patient } = await import("../models/Patient.js");
         
         // Create patient record with required fields
@@ -93,67 +143,165 @@ export const register = async (req, res) => {
           chronicDiseases: req.body.chronicDiseases || []
         });
         
+        console.log(`Patient record created with ID: ${patient._id}`);
         roleSpecificData = { patientId: patient._id };
-      } catch (patientError) {
-        console.error('Error creating patient record during registration:', patientError);
-        // Continue with user registration even if patient record creation fails
-        // We can update the patient record later
       }
-    }
-    else if (userRole === 'nurse') {
-      // Import Nurse model dynamically
-      const { Nurse } = await import("../models/Nurse.js");
-      
-      // Create nurse record
-      const nurse = await Nurse.create({
-        user: user._id,
-        department: req.body.department || 'General',
-        shift: req.body.shift || 'Morning',
-        qualification: req.body.qualification || 'Registered Nurse',
-        experience: req.body.experience || 0,
-        specialization: req.body.specialization || 'General Care',
-        workingDays: req.body.workingDays || ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-        workingHours: req.body.workingHours || { start: '09:00', end: '17:00' }
-      });
-      
-      roleSpecificData = { nurseId: nurse._id };
-    }
-    else if (userRole === 'receptionist') {
-      // Import Receptionist model dynamically
-      const { Receptionist } = await import("../models/Receptionist.js");
-      
-      // Create receptionist record
-      const receptionist = await Receptionist.create({
-        user: user._id,
-        assignedDepartment: req.body.assignedDepartment || 'Front Desk',
-        workingHours: req.body.workingHours || { start: '09:00', end: '17:00' },
-        workingDays: req.body.workingDays || ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-        jobResponsibilities: req.body.jobResponsibilities || ['Patient Registration', 'Appointment Scheduling'],
-        languages: req.body.languages || ['English']
-      });
-      
-      roleSpecificData = { receptionistId: receptionist._id };
-    }
-    else if (userRole === 'admin') {
-      // Import the Admin model dynamically
-      const { Admin } = await import("../models/Admin.js");
-      
-      // Create a basic admin record
-      const admin = await Admin.create({
-        user: user._id,
-        adminLevel: 'assistant', // Default level
-        permissions: ['view_reports'], // Limited permissions by default
-        department: 'Administration',
-        contactNumber: '',
-        office: 'Main Office',
-        joinDate: new Date()
-      });
-      
-      roleSpecificData = { adminId: admin._id };
+      else if (userRole === 'nurse') {
+        // Import Nurse model dynamically
+        const { Nurse } = await import("../models/Nurse.js");
+        
+        // Create nurse record
+        const nurse = await Nurse.create({
+          user: user._id,
+          department: req.body.department || 'General',
+          shift: req.body.shift || 'Morning',
+          qualification: req.body.qualification || 'Registered Nurse',
+          experience: req.body.experience || 0,
+          specialization: req.body.specialization || 'General Care',
+          workingDays: req.body.workingDays || ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+          workingHours: req.body.workingHours || { start: '09:00', end: '17:00' }
+        });
+        
+        console.log(`Nurse record created with ID: ${nurse._id}`);
+        roleSpecificData = { nurseId: nurse._id };
+      }
+      else if (userRole === 'receptionist') {
+        // Import Receptionist model dynamically
+        const { Receptionist } = await import("../models/Receptionist.js");
+    
+        // Create receptionist record
+        const receptionist = await Receptionist.create({
+            user: user._id,
+            workingHours: req.body.workingHours || { start: '09:00', end: '17:00' },
+            assignedDepartment: req.body.assignedDepartment || 'Front Desk',
+            jobResponsibilities: req.body.jobResponsibilities || ['Patient Registration', 'Appointment Scheduling'],
+            languages: req.body.languages || ['English'],
+            feedbackRating: null, // Explicitly set to null to avoid validation error
+        });
+    
+        console.log(`Receptionist record created with ID: ${receptionist._id}`);
+        roleSpecificData = { receptionistId: receptionist._id };
+      }
+      else if (userRole === 'admin') {
+        console.log('Attempting to create admin record');
+        
+        try {
+          // Import the Admin model dynamically
+          const AdminModule = await import("../models/Admin.js");
+          const Admin = AdminModule.Admin;
+          
+          if (!Admin) {
+            console.error('Admin model not found in the imported module');
+            throw new Error('Admin model not available');
+          }
+          
+          // Get valid permissions from Admin model schema
+          const adminSchema = Admin.schema;
+          const validPermissions = adminSchema.path('permissions.0').enumValues;
+          console.log('Valid admin permissions:', validPermissions);
+          
+          // Filter provided permissions to only include valid ones
+          let adminPermissions = ['view_reports']; // Default permission
+          
+          if (permissions && Array.isArray(permissions)) {
+            console.log('Permissions provided:', permissions);
+            
+            // Convert all permissions to lowercase for case-insensitive comparison
+            const normalizedPermissions = permissions.map(p => p.toLowerCase());
+            const normalizedValidPermissions = validPermissions.map(p => p.toLowerCase());
+            
+            // For each provided permission, find the correctly cased version
+            adminPermissions = normalizedPermissions
+              .map((p, index) => {
+                const validIndex = normalizedValidPermissions.indexOf(p);
+                if (validIndex !== -1) {
+                  return validPermissions[validIndex]; // Return the correctly cased version
+                }
+                console.warn(`Permission not found: ${permissions[index]}`);
+                return null;
+              })
+              .filter(p => p !== null); // Remove any permissions that weren't found
+            
+            console.log('Normalized permissions:', adminPermissions);
+            
+            // If no valid permissions found, use default
+            if (adminPermissions.length === 0) {
+              console.warn('No valid permissions found, using default permissions');
+              adminPermissions = ['view_reports'];
+            }
+          }
+          
+          // Create admin record with provided or default values
+          const adminData = {
+            user: user._id,
+            adminLevel: adminLevel || 'assistant',
+            permissions: adminPermissions,
+            department: department || 'Administration',
+            contactNumber: contactNumber || '',
+            office: office || 'Main Office',
+            joinDate: new Date()
+          };
+
+          console.log('Creating admin with data:', JSON.stringify(adminData));
+          const admin = await Admin.create(adminData);
+          
+          console.log(`Admin record created with ID: ${admin._id}`);
+          roleSpecificData = { adminId: admin._id };
+        } catch (adminError) {
+          console.error('Error creating admin record:', adminError);
+          
+          // Try creating with just the basic permissions if there was an error with permissions
+          if (adminError.message.includes('permissions')) {
+            try {
+              console.log('Attempting to create admin with basic permissions only');
+              
+              const AdminModule = await import("../models/Admin.js");
+              const Admin = AdminModule.Admin;
+              
+              const admin = await Admin.create({
+                user: user._id,
+                adminLevel: adminLevel || 'assistant',
+                permissions: ['view_reports'], // Use only a safe default permission
+                department: department || 'Administration',
+                contactNumber: contactNumber || '',
+                office: office || 'Main Office',
+                joinDate: new Date()
+              });
+              
+              console.log(`Admin record created with basic permissions. ID: ${admin._id}`);
+              roleSpecificData = { adminId: admin._id };
+            } catch (retryError) {
+              console.error('Second attempt to create admin failed:', retryError);
+              roleSpecificData = { 
+                adminId: null, 
+                adminError: `First error: ${adminError.message}. Retry error: ${retryError.message}`
+              };
+            }
+          } else {
+            // Continue with user registration even if admin record creation fails
+            roleSpecificData = { 
+              adminId: null, 
+              adminError: adminError.message
+            };
+          }
+        }
+      }
+    } catch (roleSpecificError) {
+      console.error(`Error creating ${userRole} record:`, roleSpecificError);
+      // We don't fail the whole registration if only the role-specific record fails
+      // User is already created at this point
     }
 
     // Generate token
     const token = generateToken(user._id);
+    
+    if (!token) {
+      console.error('Failed to generate token for user:', user._id);
+      return res.status(500).json({
+        success: false,
+        message: 'Error generating authentication token'
+      });
+    }
 
     res.status(201).json({
       success: true,
@@ -170,7 +318,8 @@ export const register = async (req, res) => {
     console.error('Register error:', error);
     res.status(500).json({
       success: false,
-      message: 'Server Error'
+      message: error.message || 'Server Error',
+      error: error.message
     });
   }
 };

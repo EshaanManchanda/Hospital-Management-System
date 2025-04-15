@@ -23,10 +23,17 @@ router.post('/register', registerPatient);
 // Protected routes
 router.use(protect);
 
+// Profile route should come before the /:id route
+
 // Patient routes
 router.route('/')
     .get(authorize('admin', 'doctor'), getAllPatients)
     .post(authorize('admin'), createPatient);
+// Stats route
+router.get('/stats', authorize('admin'), getPatientStats);
+
+// Doctor's patients route
+router.get('/doctor/:doctorId', authorize('admin', 'doctor'), getDoctorPatients);
 
 router.route('/:id')
     .get(getPatientById)
@@ -42,10 +49,5 @@ router.post('/:id/medications', authorize('admin', 'doctor'), addMedication);
 // Medical report routes
 router.post('/:id/reports', addMedicalReport);
 
-// Stats route
-router.get('/stats', authorize('admin'), getPatientStats);
-
-// Doctor's patients route
-router.get('/doctor/:doctorId', authorize('admin', 'doctor'), getDoctorPatients);
 
 export default router;

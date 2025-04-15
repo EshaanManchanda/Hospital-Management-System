@@ -32,6 +32,7 @@ import { Textarea } from "@/components/admin/ui/textarea";
 import { ScrollArea } from "@/components/admin/ui/scroll-area";
 import { Switch } from "@/components/admin/ui/switch";
 import { Loader2, Plus, X } from "lucide-react";
+import { toast } from "@/components/admin/ui/use-toast";
 
 // Form validation schema
 const patientSchema = z.object({
@@ -42,16 +43,28 @@ const patientSchema = z.object({
     mobile: z.string().min(10, { message: "Please enter a valid phone number." }).optional(),
     gender: z.string().min(1, { message: "Please select a gender." }),
     dateOfBirth: z.string().min(1, { message: "Please enter date of birth." }),
-    address: z.string().optional(),
+    address: z.object({
+      street: z.string().optional().default(""),
+      city: z.string().optional().default(""),
+      state: z.string().optional().default(""),
+      zipCode: z.string().optional().default(""),
+      country: z.string().optional().default(""),
+    }).optional().default({
+      street: "",
+      city: "",
+      state: "",
+      zipCode: "",
+      country: ""
+    }),
   }),
   // Patient specific information
   bloodType: z.string().min(1, { message: "Please select a blood type." }).optional(),
   height: z.coerce.number().min(1).optional(),
   weight: z.coerce.number().min(1).optional(),
   emergencyContact: z.object({
-    name: z.string().min(2, { message: "Name must be at least 2 characters." }).optional(),
-    relationship: z.string().min(2, { message: "Relationship must be at least 2 characters." }).optional(),
-    phone: z.string().min(10, { message: "Please enter a valid phone number." }).optional(),
+    name: z.string().optional(),
+    relationship: z.string().optional(),
+    phone: z.string().optional(),
   }).optional(),
   // Other patient fields
   notes: z.string().optional(),
@@ -84,7 +97,13 @@ const PatientFormDialog = ({ open, onOpenChange, patient, mode = "add", onSave }
         mobile: "",
         gender: "",
         dateOfBirth: "",
-        address: "",
+        address: {
+          street: "",
+          city: "",
+          state: "",
+          zipCode: "",
+          country: "",
+        },
       },
       bloodType: "",
       height: "",
@@ -111,16 +130,20 @@ const PatientFormDialog = ({ open, onOpenChange, patient, mode = "add", onSave }
           gender: patient.user?.gender || "",
           dateOfBirth: patient.user?.dateOfBirth ? new Date(patient.user.dateOfBirth).toISOString().split('T')[0] : "",
           address: typeof patient.user?.address === 'string' 
-            ? patient.user.address 
-            : patient.user?.address 
-              ? [
-                  patient.user.address.street,
-                  patient.user.address.city,
-                  patient.user.address.state,
-                  patient.user.address.zipCode,
-                  patient.user.address.country
-                ].filter(Boolean).join(', ')
-              : "",
+            ? { 
+                street: patient.user.address,
+                city: "",
+                state: "",
+                zipCode: "",
+                country: ""
+              } 
+            : patient.user?.address || {
+                street: "",
+                city: "",
+                state: "",
+                zipCode: "",
+                country: ""
+              }
         },
         bloodType: patient.bloodType || "",
         height: patient.height || "",
@@ -153,28 +176,84 @@ const PatientFormDialog = ({ open, onOpenChange, patient, mode = "add", onSave }
     try {
       setIsLoading(true);
       
-      // Add array fields to form data
+      // Format the data for the API
       const patientData = {
-        ...data,
-        allergies,
-        chronicConditions,
-        medications,
-        surgeries
+        // If editing, include the patient ID
+        ...(mode === "edit" && patient?._id && { _id: patient._id }),
+        
+        // User information
+        user: {
+          // If editing, include the user ID
+          ...(mode === "edit" && patient?.user?._id && { _id: patient.user._id }),
+          name: data.user.name,
+          email: data.user.email,
+          mobile: data.user.mobile || '',
+          gender: data.user.gender,
+          dateOfBirth: data.user.dateOfBirth,
+          address: data.user.address || {
+            street: "",
+            city: "",
+            state: "",
+            zipCode: "",
+            country: ""
+          }
+        },
+        
+        // Medical information
+        bloodType: data.bloodType || '',
+        height: data.height ? Number(data.height) : undefined,
+        weight: data.weight ? Number(data.weight) : undefined,
+        
+        // Emergency contact
+        emergencyContact: {
+          name: data.emergencyContact?.name || '',
+          relationship: data.emergencyContact?.relationship || '',
+          phone: data.emergencyContact?.phone || ''
+        },
+        
+        // Medical lists
+        allergies: allergies,
+        chronicConditions: chronicConditions,
+        medications: medications,
+        medicalHistory: surgeries, // Map surgeries to medicalHistory field if needed
+        
+        // Other fields
+        notes: data.notes || '',
+        status: data.status
       };
+
+      console.log('Submitting patient data:', patientData);
       
       // Call parent save handler
-      await onSave(patientData);
+      const result = await onSave(patientData);
       
-      // Reset form
-      form.reset();
-      setAllergies([]);
-      setChronicConditions([]);
-      setMedications([]);
-      setSurgeries([]);
-      setActiveTab("personal");
+      if (result && result.success) {
+        // Reset form only if save was successful
+        form.reset();
+        setAllergies([]);
+        setChronicConditions([]);
+        setMedications([]);
+        setSurgeries([]);
+        setActiveTab("personal");
+        
+        // Close the dialog
+        onOpenChange(false);
+      } else {
+        // Show error toast
+        toast({
+          title: "Error",
+          description: result?.message || "Failed to save patient",
+          variant: "destructive",
+        });
+      }
       
     } catch (error) {
       console.error("Error saving patient:", error);
+      toast({
+        title: "Error",
+        description: error.message || "An unexpected error occurred",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -228,8 +307,8 @@ const PatientFormDialog = ({ open, onOpenChange, patient, mode = "add", onSave }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-4xl h-[90vh] overflow-hidden p-0">
+        <DialogHeader className="px-6 py-4 border-b">
           <DialogTitle>{mode === "edit" ? "Edit Patient" : "Add New Patient"}</DialogTitle>
           <DialogDescription>
             {mode === "edit" ? "Edit the details of the patient" : "Add a new patient to the system"}
@@ -237,166 +316,28 @@ const PatientFormDialog = ({ open, onOpenChange, patient, mode = "add", onSave }
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 flex flex-col flex-1">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-              <TabsList className="grid grid-cols-4 mb-4">
-                <TabsTrigger value="personal">Personal Info</TabsTrigger>
-                <TabsTrigger value="medical">Medical</TabsTrigger>
-                <TabsTrigger value="emergency">Emergency</TabsTrigger>
-                <TabsTrigger value="status">Status</TabsTrigger>
-              </TabsList>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-[calc(90vh-12rem)]">
+            <div className="flex-1 overflow-hidden">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
+                <TabsList className="px-6 mb-3">
+                  <TabsTrigger value="personal">Personal Info</TabsTrigger>
+                  <TabsTrigger value="medical">Medical</TabsTrigger>
+                  <TabsTrigger value="emergency">Emergency</TabsTrigger>
+                  <TabsTrigger value="status">Status</TabsTrigger>
+                </TabsList>
 
-              <ScrollArea className="flex-1 pr-4">
-                {/* Personal Information Tab */}
-                <TabsContent value="personal" className="space-y-4 min-h-[50vh]">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="user.name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Full Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="John Doe" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="user.email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email Address</FormLabel>
-                          <FormControl>
-                            <Input placeholder="john.doe@example.com" type="email" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="user.mobile"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Phone Number</FormLabel>
-                          <FormControl>
-                            <Input placeholder="+1 (555) 123-4567" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="user.dateOfBirth"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Date of Birth</FormLabel>
-                          <FormControl>
-                            <Input type="date" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="user.gender"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Gender</FormLabel>
-                          <Select 
-                            onValueChange={field.onChange} 
-                            defaultValue={field.value}
-                            value={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select gender" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="male">Male</SelectItem>
-                              <SelectItem value="female">Female</SelectItem>
-                              <SelectItem value="other">Other</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="user.address"
-                      render={({ field }) => (
-                        <FormItem className="md:col-span-2">
-                          <FormLabel>Address</FormLabel>
-                          <FormControl>
-                            <Textarea 
-                              placeholder="123 Main St, City, State 12345" 
-                              {...field} 
-                              rows={3}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </TabsContent>
-                
-                {/* Medical Information Tab */}
-                <TabsContent value="medical" className="space-y-4 min-h-[50vh]">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="bloodType"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Blood Type</FormLabel>
-                          <Select 
-                            onValueChange={field.onChange} 
-                            defaultValue={field.value}
-                            value={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select blood type" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="A+">A+</SelectItem>
-                              <SelectItem value="A-">A-</SelectItem>
-                              <SelectItem value="B+">B+</SelectItem>
-                              <SelectItem value="B-">B-</SelectItem>
-                              <SelectItem value="AB+">AB+</SelectItem>
-                              <SelectItem value="AB-">AB-</SelectItem>
-                              <SelectItem value="O+">O+</SelectItem>
-                              <SelectItem value="O-">O-</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <div className="grid grid-cols-2 gap-4">
+                <ScrollArea className="flex-1 px-6">
+                  {/* Personal Information Tab */}
+                  <TabsContent value="personal" className="space-y-4 min-h-[50vh]">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
-                        name="height"
+                        name="user.name"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Height (cm)</FormLabel>
+                            <FormLabel>Full Name</FormLabel>
                             <FormControl>
-                              <Input type="number" min="1" {...field} />
+                              <Input placeholder="John Doe" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -405,253 +346,449 @@ const PatientFormDialog = ({ open, onOpenChange, patient, mode = "add", onSave }
                       
                       <FormField
                         control={form.control}
-                        name="weight"
+                        name="user.email"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Weight (kg)</FormLabel>
+                            <FormLabel>Email Address</FormLabel>
                             <FormControl>
-                              <Input type="number" min="1" {...field} />
+                              <Input placeholder="john.doe@example.com" type="email" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={form.control}
+                        name="user.mobile"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Phone Number</FormLabel>
+                            <FormControl>
+                              <Input placeholder="+1 (555) 123-4567" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={form.control}
+                        name="user.dateOfBirth"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Date of Birth</FormLabel>
+                            <FormControl>
+                              <Input type="date" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={form.control}
+                        name="user.gender"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Gender</FormLabel>
+                            <Select 
+                              onValueChange={field.onChange} 
+                              defaultValue={field.value}
+                              value={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select gender" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="male">Male</SelectItem>
+                                <SelectItem value="female">Female</SelectItem>
+                                <SelectItem value="other">Other</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={form.control}
+                        name="user.address.street"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Street Address</FormLabel>
+                            <FormControl>
+                              <Input placeholder="123 Main St" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="user.address.city"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>City</FormLabel>
+                              <FormControl>
+                                <Input placeholder="New York" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={form.control}
+                          name="user.address.state"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>State/Province</FormLabel>
+                              <FormControl>
+                                <Input placeholder="NY" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="user.address.zipCode"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>ZIP/Postal Code</FormLabel>
+                              <FormControl>
+                                <Input placeholder="10001" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={form.control}
+                          name="user.address.country"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Country</FormLabel>
+                              <FormControl>
+                                <Input placeholder="USA" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+                  </TabsContent>
+                  
+                  {/* Medical Information Tab */}
+                  <TabsContent value="medical" className="space-y-4 min-h-[50vh]">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="bloodType"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Blood Type</FormLabel>
+                            <Select 
+                              onValueChange={field.onChange} 
+                              defaultValue={field.value}
+                              value={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select blood type" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="A+">A+</SelectItem>
+                                <SelectItem value="A-">A-</SelectItem>
+                                <SelectItem value="B+">B+</SelectItem>
+                                <SelectItem value="B-">B-</SelectItem>
+                                <SelectItem value="AB+">AB+</SelectItem>
+                                <SelectItem value="AB-">AB-</SelectItem>
+                                <SelectItem value="O+">O+</SelectItem>
+                                <SelectItem value="O-">O-</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="height"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Height (cm)</FormLabel>
+                              <FormControl>
+                                <Input type="number" min="1" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={form.control}
+                          name="weight"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Weight (kg)</FormLabel>
+                              <FormControl>
+                                <Input type="number" min="1" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      
+                      <div className="md:col-span-2">
+                        <FormLabel className="block mb-2">Allergies</FormLabel>
+                        <div className="space-y-2">
+                          <div className="flex space-x-2">
+                            <Input 
+                              placeholder="Add allergy"
+                              value={newAllergy}
+                              onChange={(e) => setNewAllergy(e.target.value)}
+                              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addAllergy())}
+                            />
+                            <Button type="button" size="icon" onClick={addAllergy}>
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {allergies.map((allergy, index) => (
+                              <div key={index} className="flex items-center bg-slate-100 rounded-md px-3 py-1 text-sm">
+                                <span>{allergy}</span>
+                                <Button 
+                                  type="button" 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-6 w-6 ml-1 p-0"
+                                  onClick={() => removeAllergy(index)}
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="md:col-span-2">
+                        <FormLabel className="block mb-2">Chronic Conditions</FormLabel>
+                        <div className="space-y-2">
+                          <div className="flex space-x-2">
+                            <Input 
+                              placeholder="Add chronic condition"
+                              value={newCondition}
+                              onChange={(e) => setNewCondition(e.target.value)}
+                              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addCondition())}
+                            />
+                            <Button type="button" size="icon" onClick={addCondition}>
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {chronicConditions.map((condition, index) => (
+                              <div key={index} className="flex items-center bg-slate-100 rounded-md px-3 py-1 text-sm">
+                                <span>{condition}</span>
+                                <Button 
+                                  type="button" 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-6 w-6 ml-1 p-0"
+                                  onClick={() => removeCondition(index)}
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="md:col-span-2">
+                        <FormLabel className="block mb-2">Current Medications</FormLabel>
+                        <div className="space-y-2">
+                          <div className="flex space-x-2">
+                            <Input 
+                              placeholder="Add medication"
+                              value={newMedication}
+                              onChange={(e) => setNewMedication(e.target.value)}
+                              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addMedication())}
+                            />
+                            <Button type="button" size="icon" onClick={addMedication}>
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {medications.map((medication, index) => (
+                              <div key={index} className="flex items-center bg-slate-100 rounded-md px-3 py-1 text-sm">
+                                <span>{medication}</span>
+                                <Button 
+                                  type="button" 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-6 w-6 ml-1 p-0"
+                                  onClick={() => removeMedication(index)}
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="md:col-span-2">
+                        <FormLabel className="block mb-2">Past Surgeries</FormLabel>
+                        <div className="space-y-2">
+                          <div className="flex space-x-2">
+                            <Input 
+                              placeholder="Add surgery"
+                              value={newSurgery}
+                              onChange={(e) => setNewSurgery(e.target.value)}
+                              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addSurgery())}
+                            />
+                            <Button type="button" size="icon" onClick={addSurgery}>
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {surgeries.map((surgery, index) => (
+                              <div key={index} className="flex items-center bg-slate-100 rounded-md px-3 py-1 text-sm">
+                                <span>{surgery}</span>
+                                <Button 
+                                  type="button" 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-6 w-6 ml-1 p-0"
+                                  onClick={() => removeSurgery(index)}
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <FormField
+                        control={form.control}
+                        name="notes"
+                        render={({ field }) => (
+                          <FormItem className="md:col-span-2">
+                            <FormLabel>Medical Notes</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                placeholder="Add any additional medical notes here" 
+                                {...field} 
+                                rows={4}
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
                     </div>
-                    
-                    <div className="md:col-span-2">
-                      <FormLabel className="block mb-2">Allergies</FormLabel>
-                      <div className="space-y-2">
-                        <div className="flex space-x-2">
-                          <Input 
-                            placeholder="Add allergy"
-                            value={newAllergy}
-                            onChange={(e) => setNewAllergy(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addAllergy())}
-                          />
-                          <Button type="button" size="icon" onClick={addAllergy}>
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {allergies.map((allergy, index) => (
-                            <div key={index} className="flex items-center bg-slate-100 rounded-md px-3 py-1 text-sm">
-                              <span>{allergy}</span>
-                              <Button 
-                                type="button" 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-6 w-6 ml-1 p-0"
-                                onClick={() => removeAllergy(index)}
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="md:col-span-2">
-                      <FormLabel className="block mb-2">Chronic Conditions</FormLabel>
-                      <div className="space-y-2">
-                        <div className="flex space-x-2">
-                          <Input 
-                            placeholder="Add chronic condition"
-                            value={newCondition}
-                            onChange={(e) => setNewCondition(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addCondition())}
-                          />
-                          <Button type="button" size="icon" onClick={addCondition}>
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {chronicConditions.map((condition, index) => (
-                            <div key={index} className="flex items-center bg-slate-100 rounded-md px-3 py-1 text-sm">
-                              <span>{condition}</span>
-                              <Button 
-                                type="button" 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-6 w-6 ml-1 p-0"
-                                onClick={() => removeCondition(index)}
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="md:col-span-2">
-                      <FormLabel className="block mb-2">Current Medications</FormLabel>
-                      <div className="space-y-2">
-                        <div className="flex space-x-2">
-                          <Input 
-                            placeholder="Add medication"
-                            value={newMedication}
-                            onChange={(e) => setNewMedication(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addMedication())}
-                          />
-                          <Button type="button" size="icon" onClick={addMedication}>
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {medications.map((medication, index) => (
-                            <div key={index} className="flex items-center bg-slate-100 rounded-md px-3 py-1 text-sm">
-                              <span>{medication}</span>
-                              <Button 
-                                type="button" 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-6 w-6 ml-1 p-0"
-                                onClick={() => removeMedication(index)}
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="md:col-span-2">
-                      <FormLabel className="block mb-2">Past Surgeries</FormLabel>
-                      <div className="space-y-2">
-                        <div className="flex space-x-2">
-                          <Input 
-                            placeholder="Add surgery"
-                            value={newSurgery}
-                            onChange={(e) => setNewSurgery(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addSurgery())}
-                          />
-                          <Button type="button" size="icon" onClick={addSurgery}>
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {surgeries.map((surgery, index) => (
-                            <div key={index} className="flex items-center bg-slate-100 rounded-md px-3 py-1 text-sm">
-                              <span>{surgery}</span>
-                              <Button 
-                                type="button" 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-6 w-6 ml-1 p-0"
-                                onClick={() => removeSurgery(index)}
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <FormField
-                      control={form.control}
-                      name="notes"
-                      render={({ field }) => (
-                        <FormItem className="md:col-span-2">
-                          <FormLabel>Medical Notes</FormLabel>
-                          <FormControl>
-                            <Textarea 
-                              placeholder="Add any additional medical notes here" 
-                              {...field} 
-                              rows={4}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </TabsContent>
-                
-                {/* Emergency Contact Tab */}
-                <TabsContent value="emergency" className="space-y-4 min-h-[50vh]">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="emergencyContact.name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Contact Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Emergency contact name" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="emergencyContact.relationship"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Relationship</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Spouse, Parent, etc." {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="emergencyContact.phone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Phone Number</FormLabel>
-                          <FormControl>
-                            <Input placeholder="+1 (555) 123-4567" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </TabsContent>
-                
-                {/* Status Tab */}
-                <TabsContent value="status" className="space-y-4 min-h-[50vh]">
-                  <div className="grid grid-cols-1 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="status"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Patient Status</FormLabel>
-                          <Select 
-                            onValueChange={field.onChange} 
-                            defaultValue={field.value}
-                            value={field.value}
-                          >
+                  </TabsContent>
+                  
+                  {/* Emergency Contact Tab */}
+                  <TabsContent value="emergency" className="space-y-4 min-h-[50vh]">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="emergencyContact.name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Contact Name</FormLabel>
                             <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select status" />
-                              </SelectTrigger>
+                              <Input placeholder="Emergency contact name" {...field} />
                             </FormControl>
-                            <SelectContent>
-                              <SelectItem value="Active">Active</SelectItem>
-                              <SelectItem value="Inactive">Inactive</SelectItem>
-                              <SelectItem value="Deceased">Deceased</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </TabsContent>
-              </ScrollArea>
-            </Tabs>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={form.control}
+                        name="emergencyContact.relationship"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Relationship</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Spouse, Parent, etc." {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={form.control}
+                        name="emergencyContact.phone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Phone Number</FormLabel>
+                            <FormControl>
+                              <Input placeholder="+1 (555) 123-4567" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </TabsContent>
+                  
+                  {/* Status Tab */}
+                  <TabsContent value="status" className="space-y-4 min-h-[50vh]">
+                    <div className="grid grid-cols-1 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="status"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Patient Status</FormLabel>
+                            <Select 
+                              onValueChange={field.onChange} 
+                              defaultValue={field.value}
+                              value={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select status" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="Active">Active</SelectItem>
+                                <SelectItem value="Inactive">Inactive</SelectItem>
+                                <SelectItem value="Deceased">Deceased</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </TabsContent>
+                </ScrollArea>
+              </Tabs>
+            </div>
 
-            <DialogFooter className="pt-2">
+            <DialogFooter className="px-6 py-4 border-t mt-auto">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>

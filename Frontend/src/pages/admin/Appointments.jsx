@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Table, 
   TableBody, 
@@ -51,54 +51,7 @@ import AppointmentDetails from "@/components/admin/appointments/AppointmentDetai
 import RescheduleAppointment from "@/components/admin/appointments/RescheduleAppointment";
 import NewAppointment from "@/components/admin/appointments/NewAppointment";
 
-// Mock appointment data
-const appointments = [
-  {
-    id: "A001",
-    patientName: "Sarah Johnson",
-    doctorName: "Dr. James Wilson",
-    date: "2023-12-22",
-    time: "09:00 AM",
-    type: "Consultation",
-    status: "scheduled",
-  },
-  {
-    id: "A002",
-    patientName: "Mike Peterson",
-    doctorName: "Dr. Sarah Parker",
-    date: "2023-12-22",
-    time: "10:30 AM",
-    type: "Follow-up",
-    status: "completed",
-  },
-  {
-    id: "A003",
-    patientName: "Emily Williams",
-    doctorName: "Dr. Michael Chen",
-    date: "2023-12-22",
-    time: "11:45 AM",
-    type: "Emergency",
-    status: "scheduled",
-  },
-  {
-    id: "A004",
-    patientName: "Robert Thompson",
-    doctorName: "Dr. Elizabeth Taylor",
-    date: "2023-12-23",
-    time: "09:15 AM",
-    type: "Consultation",
-    status: "cancelled",
-  },
-  {
-    id: "A005",
-    patientName: "Linda Garcia",
-    doctorName: "Dr. Robert Johnson",
-    date: "2023-12-23",
-    time: "02:00 PM",
-    type: "Follow-up",
-    status: "scheduled",
-  },
-];
+import appointmentService from "@/services/appointmentService";
 
 const statusStyles = {
   scheduled: "bg-blue-100 text-blue-800 hover:bg-blue-100",
@@ -111,12 +64,57 @@ const Appointments = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isMarkCompleteDialogOpen, setIsMarkCompleteDialogOpen] = useState(false);
   const [selectedAppointmentId, setSelectedAppointmentId] = useState(null);
-  const [appointmentsData, setAppointmentsData] = useState(appointments);
+  const [appointmentsData, setAppointmentsData] = useState([]);
   const [filterStatus, setFilterStatus] = useState("all");
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false);
   const [isNewAppointmentModalOpen, setIsNewAppointmentModalOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
+  const [totalCount, setTotalCount] = useState(0);
+  
+  // Fetch appointments on component mount
+  useEffect(() => {
+    fetchAppointments();
+  }, [page, limit]);
+  
+  // Function to fetch appointments from API
+  const fetchAppointments = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const response = await appointmentService.getAllAppointments(page, limit);
+      
+      if (response && response.success) {
+        // Format the appointments data to match the expected structure
+        const formattedAppointments = response.data.map(appointment => ({
+          id: appointment._id,
+          patientName: appointment.patient?.name || 'Unknown Patient',
+          doctorName: appointment.doctor?.user?.name || 'Unknown Doctor',
+          date: new Date(appointment.date).toISOString().split('T')[0],
+          time: appointment.time,
+          type: appointment.type,
+          status: appointment.status,
+          // Store the original appointment data for reference
+          originalData: appointment
+        }));
+        
+        setAppointmentsData(formattedAppointments);
+        setTotalCount(response.count || 0);
+      } else {
+        setError(response?.message || 'Failed to fetch appointments');
+      }
+    } catch (err) {
+      console.error('Error fetching appointments:', err);
+      setError('Failed to load appointments. Please try again later.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Filter appointments based on search term and status filter
   const filteredAppointments = appointmentsData.filter(
@@ -132,59 +130,132 @@ const Appointments = () => {
     }
   );
 
-  const handleStatusChange = (appointmentId, newStatus) => {
-    setAppointmentsData(prevData => 
-      prevData.map(appointment => 
-        appointment.id === appointmentId 
-          ? { ...appointment, status: newStatus } 
-          : appointment
-      )
-    );
-    
-    toast({
-      title: "Status Updated",
-      description: "Appointment status has been updated successfully.",
-    });
+  const handleStatusChange = async (appointmentId, newStatus) => {
+    try {
+      // Find the appointment to update
+      const appointmentToUpdate = appointmentsData.find(app => app.id === appointmentId);
+      if (!appointmentToUpdate) return;
+      
+      // Call API to update appointment status
+      const response = await appointmentService.updateAppointment(appointmentId, {
+        status: newStatus
+      });
+      
+      if (response && response.success) {
+        // Update local state
+        setAppointmentsData(prevData => 
+          prevData.map(appointment => 
+            appointment.id === appointmentId 
+              ? { ...appointment, status: newStatus } 
+              : appointment
+          )
+        );
+        
+        toast({
+          title: "Status Updated",
+          description: "Appointment status has been updated successfully.",
+        });
+      } else {
+        toast({
+          title: "Update Failed",
+          description: response?.message || "Failed to update appointment status.",
+          variant: "destructive"
+        });
+      }
+    } catch (err) {
+      console.error('Error updating appointment status:', err);
+      toast({
+        title: "Update Failed",
+        description: "An error occurred while updating the appointment status.",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleMarkComplete = () => {
+  const handleMarkComplete = async () => {
     if (!selectedAppointmentId) return;
     
-    setAppointmentsData(prevData => 
-      prevData.map(appointment => 
-        appointment.id === selectedAppointmentId 
-          ? { ...appointment, status: "completed" } 
-          : appointment
-      )
-    );
-    
-    setIsMarkCompleteDialogOpen(false);
-    setSelectedAppointmentId(null);
-    
-    toast({
-      title: "Appointment Completed",
-      description: "The appointment has been marked as completed.",
-    });
+    try {
+      // Call API to update appointment status
+      const response = await appointmentService.updateAppointment(selectedAppointmentId, {
+        status: "completed"
+      });
+      
+      if (response && response.success) {
+        // Update local state
+        setAppointmentsData(prevData => 
+          prevData.map(appointment => 
+            appointment.id === selectedAppointmentId 
+              ? { ...appointment, status: "completed" } 
+              : appointment
+          )
+        );
+        
+        setIsMarkCompleteDialogOpen(false);
+        setSelectedAppointmentId(null);
+        
+        toast({
+          title: "Appointment Completed",
+          description: "The appointment has been marked as completed.",
+        });
+      } else {
+        toast({
+          title: "Update Failed",
+          description: response?.message || "Failed to mark appointment as completed.",
+          variant: "destructive"
+        });
+      }
+    } catch (err) {
+      console.error('Error marking appointment as completed:', err);
+      toast({
+        title: "Update Failed",
+        description: "An error occurred while updating the appointment.",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleCancelAppointment = () => {
+  const handleCancelAppointment = async () => {
     if (!selectedAppointmentId) return;
     
-    setAppointmentsData(prevData => 
-      prevData.map(appointment => 
-        appointment.id === selectedAppointmentId 
-          ? { ...appointment, status: "cancelled" } 
-          : appointment
-      )
-    );
-    
-    setIsDeleteDialogOpen(false);
-    setSelectedAppointmentId(null);
-    
-    toast({
-      title: "Appointment Cancelled",
-      description: "The appointment has been cancelled successfully.",
-    });
+    try {
+      // Call API to update appointment status
+      const response = await appointmentService.updateAppointment(selectedAppointmentId, {
+        status: "cancelled"
+      });
+      
+      if (response && response.success) {
+        // Update local state
+        setAppointmentsData(prevData => 
+          prevData.map(appointment => 
+            appointment.id === selectedAppointmentId 
+              ? { ...appointment, status: "cancelled" } 
+              : appointment
+          )
+        );
+        
+        setIsDeleteDialogOpen(false);
+        setSelectedAppointmentId(null);
+        
+        toast({
+          title: "Appointment Cancelled",
+          description: "The appointment has been cancelled successfully.",
+        });
+      } else {
+        toast({
+          title: "Cancellation Failed",
+          description: response?.message || "Failed to cancel the appointment.",
+          variant: "destructive"
+        });
+      }
+    } catch (err) {
+      console.error('Error cancelling appointment:', err);
+      toast({
+        title: "Cancellation Failed",
+        description: "An error occurred while cancelling the appointment.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleViewDetails = (appointment) => {
@@ -197,33 +268,88 @@ const Appointments = () => {
     setIsRescheduleModalOpen(true);
   };
 
-  const handleUpdateAppointment = (updatedAppointment) => {
-    setAppointmentsData(prevData => 
-      prevData.map(appointment => 
-        appointment.id === updatedAppointment.id 
-          ? updatedAppointment 
-          : appointment
-      )
-    );
-    setIsRescheduleModalOpen(false);
-    
-    toast({
-      title: "Appointment Updated",
-      description: "The appointment has been rescheduled successfully.",
-    });
+  const handleUpdateAppointment = async (updatedAppointment) => {
+    try {
+      // Prepare data for API
+      const appointmentData = {
+        date: updatedAppointment.date,
+        time: updatedAppointment.time,
+        type: updatedAppointment.type,
+        // Include any other fields that might have been updated
+      };
+      
+      // Call API to update appointment
+      const response = await appointmentService.updateAppointment(updatedAppointment.id, appointmentData);
+      
+      if (response && response.success) {
+        // Update local state
+        setAppointmentsData(prevData => 
+          prevData.map(appointment => 
+            appointment.id === updatedAppointment.id 
+              ? updatedAppointment 
+              : appointment
+          )
+        );
+        setIsRescheduleModalOpen(false);
+        
+        toast({
+          title: "Appointment Updated",
+          description: "The appointment has been rescheduled successfully.",
+        });
+      } else {
+        toast({
+          title: "Update Failed",
+          description: response?.message || "Failed to update the appointment.",
+          variant: "destructive"
+        });
+      }
+    } catch (err) {
+      console.error('Error updating appointment:', err);
+      toast({
+        title: "Update Failed",
+        description: "An error occurred while updating the appointment.",
+        variant: "destructive"
+      });
+    }
   };
 
-  const handleAddAppointment = (newAppointment) => {
-    setAppointmentsData(prev => [
-      ...prev,
-      { ...newAppointment, id: `A00${prev.length + 1}`, status: "scheduled" }
-    ]);
-    setIsNewAppointmentModalOpen(false);
-    
-    toast({
-      title: "Appointment Created",
-      description: "New appointment has been created successfully.",
-    });
+  const handleAddAppointment = async (newAppointment) => {
+    try {
+      // Call API to create appointment
+      const response = await appointmentService.createAppointment({
+        patientId: newAppointment.patientId,
+        doctorId: newAppointment.doctorId,
+        date: newAppointment.date,
+        time: newAppointment.time,
+        type: newAppointment.type,
+        description: newAppointment.description || '',
+        symptoms: newAppointment.symptoms || ''
+      });
+      
+      if (response && response.success) {
+        // Refresh the appointments list
+        fetchAppointments();
+        setIsNewAppointmentModalOpen(false);
+        
+        toast({
+          title: "Appointment Created",
+          description: "New appointment has been created successfully.",
+        });
+      } else {
+        toast({
+          title: "Creation Failed",
+          description: response?.message || "Failed to create the appointment.",
+          variant: "destructive"
+        });
+      }
+    } catch (err) {
+      console.error('Error creating appointment:', err);
+      toast({
+        title: "Creation Failed",
+        description: "An error occurred while creating the appointment.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -295,7 +421,30 @@ const Appointments = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredAppointments.length > 0 ? (
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8">
+                    <div className="flex justify-center items-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-hospital-primary"></div>
+                      <span className="ml-2">Loading appointments...</span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : error ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8 text-red-500">
+                    {error}
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="ml-4"
+                      onClick={fetchAppointments}
+                    >
+                      Retry
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ) : filteredAppointments.length > 0 ? (
                 filteredAppointments.map((appointment) => (
                   <TableRow key={appointment.id}>
                     <TableCell className="font-medium">{appointment.id}</TableCell>
@@ -381,6 +530,33 @@ const Appointments = () => {
         </div>
       </div>
 
+      {/* Pagination Controls */}
+      {!isLoading && !error && totalCount > 0 && (
+        <div className="flex justify-between items-center mt-4 px-2">
+          <div className="text-sm text-gray-500">
+            Showing {appointmentsData.length} of {totalCount} appointments
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(prev => Math.max(prev - 1, 1))}
+              disabled={page === 1}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(prev => prev + 1)}
+              disabled={page * limit >= totalCount}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* View Details Modal */}
       <Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}>
         <DialogContent className="sm:max-w-lg">
@@ -388,6 +564,8 @@ const Appointments = () => {
             <AppointmentDetails 
               appointment={selectedAppointment} 
               onClose={() => setIsDetailsModalOpen(false)} 
+              // Pass the original data from API for complete details
+              originalData={selectedAppointment.originalData}
             />
           )}
         </DialogContent>
@@ -412,6 +590,8 @@ const Appointments = () => {
           <NewAppointment 
             onAdd={handleAddAppointment}
             onCancel={() => setIsNewAppointmentModalOpen(false)} 
+            // Refresh function to update the list after adding
+            onSuccess={() => fetchAppointments()}
           />
         </DialogContent>
       </Dialog>

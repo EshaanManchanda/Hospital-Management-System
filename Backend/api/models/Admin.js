@@ -24,7 +24,8 @@ const adminSchema = new mongoose.Schema({
       'manage_inventory', 
       'manage_billing', 
       'view_reports', 
-      'manage_settings'
+      'manage_settings',
+      'approve_requests'
     ]
   }],
   department: {

@@ -429,27 +429,124 @@ const handleGoogleCallback = async (token, password) => {
       throw new Error('Token verification failed');
     }
 
-    // Token is valid, get user profile data
-    const profileResponse = await api.get('/api/auth/profile', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    // Check if user already has a patient profile
+    try {
+      // Try to fetch existing patient profile first
+      const patientResponse = await api.get('/api/patients/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      if (patientResponse.data && patientResponse.data.success && patientResponse.data.patient) {
+        console.log('Found existing patient profile:', patientResponse.data.patient._id);
+        
+        // Store user data with patient ID
+        const userData = {
+          userId: verifyResponse.data.user.id || verifyResponse.data.user._id,
+          name: verifyResponse.data.user.name,
+          email: verifyResponse.data.user.email,
+          role: 'patient',
+          picture: verifyResponse.data.user.picture,
+          patientId: patientResponse.data.patient._id
+        };
+        
+        localStorage.setItem('userData', JSON.stringify(userData));
+        console.log('Stored user data with existing patient ID:', userData.patientId);
+        
+        return { 
+          success: true, 
+          userData,
+          user: userData,
+          setupRequired: false
+        };
+      }
+    } catch (fetchError) {
+      console.log('No existing patient profile found, will create new one');
+    }
 
-    // Prepare user data from the response
+    // Create patient profile if it doesn't exist
+    try {
+      const createPatientData = {
+        user: {
+          name: verifyResponse.data.user.name,
+          email: verifyResponse.data.user.email,
+          password: securePassword,
+          role: 'patient',
+          picture: verifyResponse.data.user.picture
+        },
+        // Default patient data
+        bloodGroup: '',
+        height: 0,
+        weight: 0,
+        allergies: [],
+        chronicDiseases: [],
+        emergencyContact: {
+          name: '',
+          phone: '',
+          relationship: ''
+        }
+      };
+    
+      // Create patient profile
+      const patientResponse = await api.post('/api/patients', createPatientData, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    
+      if (patientResponse.data && patientResponse.data.success) {
+        // Extract patient ID, ensuring we check all possible locations
+        const patientId = 
+          patientResponse.data.patient?._id || 
+          patientResponse.data.patient?.id || 
+          patientResponse.data._id ||
+          patientResponse.data.id;
+        
+        if (!patientId) {
+          console.error('Failed to extract patient ID from response:', patientResponse.data);
+        } else {
+          console.log('Successfully extracted patient ID:', patientId);
+        }
+        
+        // Update userData to include patientId from response
+        const userData = {
+          userId: verifyResponse.data.user.id || verifyResponse.data.user._id,
+          name: verifyResponse.data.user.name,
+          email: verifyResponse.data.user.email,
+          role: 'patient',
+          picture: verifyResponse.data.user.picture,
+          patientId: patientId
+        };
+    
+        console.log('Created patient profile with ID:', userData.patientId);
+        localStorage.setItem('userData', JSON.stringify(userData));
+    
+        return { 
+          success: true, 
+          userData,
+          user: userData,
+          setupRequired: true
+        };
+      }
+    } catch (patientError) {
+      console.error('Error creating patient profile:', patientError);
+      // Continue with basic user data if patient creation fails
+    }
+
+    // Fallback to basic user data if patient creation fails
     const userData = {
-      userId: verifyResponse.data.user.id,
+      userId: verifyResponse.data.user.id || verifyResponse.data.user._id,
       name: verifyResponse.data.user.name,
       email: verifyResponse.data.user.email,
-      role: verifyResponse.data.user.role,
+      role: 'patient',
       picture: verifyResponse.data.user.picture
     };
 
-    // Store user data
     localStorage.setItem('userData', JSON.stringify(userData));
+    console.warn('Storing user data WITHOUT patient ID as fallback');
 
     return { 
       success: true, 
       userData,
-      user: userData
+      user: userData,
+      setupRequired: true
     };
   } catch (error) {
     console.error('Google OAuth callback error:', error);
@@ -819,6 +916,93 @@ const verifyResetToken = async (token) => {
   }
 };
 
+// Get doctor profile data
+const getDoctorProfile = async () => {
+  try {
+    // Get user data from localStorage
+    const userData = JSON.parse(localStorage.getItem('userData'));
+    
+    if (!userData || userData.role !== 'doctor') {
+      throw new Error('No doctor data found or user is not a doctor');
+    }
+
+    // First try to get from localStorage
+    const cachedDoctorProfile = localStorage.getItem('doctorProfile');
+    if (cachedDoctorProfile) {
+      const parsedProfile = JSON.parse(cachedDoctorProfile);
+      console.log('Using cached doctor profile from localStorage');
+      return { success: true, doctor: parsedProfile };
+    }
+
+    // If not in localStorage, fetch from API
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+
+    // Set authorization header
+    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    
+    // Fetch doctor profile from API
+    console.log('Fetching doctor profile from API');
+    const response = await api.get('/api/doctors/me');
+    
+    if (response.data && (response.data.success || response.data.data)) {
+      // Handle both response formats: { success: true, data: {...} } or { success: true, doctor: {...} }
+      const doctorData = response.data.data || response.data.doctor;
+      
+      if (!doctorData) {
+        throw new Error('Doctor data not found in API response');
+      }
+      
+      // Format the doctor data to ensure all fields are properly structured
+      const formattedDoctorData = {
+        id: doctorData._id,
+        doctorId: doctorData._id,
+        userId: doctorData.user?._id,
+        name: doctorData.user?.name || '',
+        email: doctorData.user?.email || '',
+        mobile: doctorData.user?.mobile || '',
+        gender: doctorData.user?.gender || '',
+        profileImage: doctorData.user?.profileImage || '',
+        
+        // Professional details
+        specialization: doctorData.specialization || '',
+        experience: doctorData.experience || 0,
+        fee: doctorData.fee || 0,
+        about: doctorData.about || '',
+        isAvailable: doctorData.isAvailable !== undefined ? doctorData.isAvailable : true,
+        averageRating: doctorData.averageRating || 0,
+        
+        // Schedule information
+        workingDays: doctorData.workingDays || [],
+        workingHours: doctorData.workingHours || { start: '09:00', end: '17:00' },
+        
+        // Arrays
+        qualifications: doctorData.qualifications || [],
+        patients: doctorData.patients || [],
+        appointments: doctorData.appointments || [],
+        ratings: doctorData.ratings || [],
+        
+        // Timestamps
+        createdAt: doctorData.createdAt,
+        updatedAt: doctorData.updatedAt
+      };
+      
+      // Cache the formatted doctor profile in localStorage
+      localStorage.setItem('doctorProfile', JSON.stringify(formattedDoctorData));
+      console.log('Cached doctor profile in localStorage');
+      
+      return { success: true, doctor: formattedDoctorData };
+    } else {
+      throw new Error(response.data?.message || 'Failed to fetch doctor profile');
+    }
+  } catch (error) {
+    console.error('Error fetching doctor profile:', error);
+    return { success: false, message: error.message };
+  }
+};
+
 const authService = {
   login,
   logout,
@@ -833,6 +1017,7 @@ const authService = {
   forgotPassword,
   resetPassword,
   verifyResetToken,
+  getDoctorProfile, // Add the new function to the exported object
   getUserData: () => {
     return JSON.parse(localStorage.getItem('userData'));
   },

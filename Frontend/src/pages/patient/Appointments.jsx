@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { 
   CalendarDays, 
   Clock, 
@@ -15,30 +15,54 @@ import {
   AlertCircle
 } from "lucide-react";
 import { authService, appointmentService } from "../../services";
+import { toast } from "react-hot-toast";
+import NewAppointmentDialog from "../../components/dialogs/NewAppointmentDialog";
 
 const Appointments = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState("all"); // all, upcoming, past, cancelled
   const [searchTerm, setSearchTerm] = useState("");
+  const [showNewAppointmentDialog, setShowNewAppointmentDialog] = useState(false);
 
+  // Add this near the top of your component, after the useState declarations
+// Location is already declared at the top of the component
+  
+  // Add this in your useEffect
   useEffect(() => {
+    // Check if we should open the new appointment dialog
+    if (location.state?.openNewAppointmentDialog) {
+      setShowNewAppointmentDialog(true);
+      // Clear the state to prevent reopening on refresh
+      window.history.replaceState({}, document.title);
+    }
+    
     const fetchAppointments = async () => {
       try {
         setLoading(true);
         const userData = authService.getUserData();
         
-        if (!userData || !userData.patientId) {
-          throw new Error("Patient information not found");
+        if (!userData) {
+          throw new Error("User information not found");
         }
         
-        const response = await appointmentService.getPatientAppointments(userData.patientId);
-        setAppointments(response.data.data || []);
+        // We don't need to pass patientId as the backend will use the authenticated user
+        const response = await appointmentService.getPatientAppointments();
+        
+        if (response.success) {
+          console.log('Appointments data:', response.data);
+          setAppointments(response.data || []);
+        } else {
+          setError(response.message || "Failed to load appointments");
+          toast.error(response.message || "Failed to load appointments");
+        }
       } catch (err) {
         console.error("Error fetching appointments:", err);
         setError("Failed to load appointments data. Please try again later.");
+        toast.error("Failed to load appointments data");
       } finally {
         setLoading(false);
       }
@@ -48,7 +72,7 @@ const Appointments = () => {
   }, []);
 
   const handleNewAppointment = () => {
-    navigate("/appointments/new");
+    setShowNewAppointmentDialog(true);
   };
 
   // Filter appointments based on status and search term
@@ -102,6 +126,59 @@ const Appointments = () => {
         return "text-red-500";
       default:
         return "text-gray-500";
+    }
+  };
+
+  // Add these new functions to handle appointment status updates
+  const handleConfirmAppointment = async (appointmentId) => {
+    try {
+      setLoading(true);
+      const response = await appointmentService.updateAppointment(appointmentId, {
+        status: "confirmed"
+      });
+      
+      if (response.success) {
+        toast.success("Appointment confirmed successfully");
+        // Update the appointment in the local state
+        setAppointments(prevAppointments => 
+          prevAppointments.map(app => 
+            app._id === appointmentId ? { ...app, status: "confirmed" } : app
+          )
+        );
+      } else {
+        toast.error(response.message || "Failed to confirm appointment");
+      }
+    } catch (err) {
+      console.error("Error confirming appointment:", err);
+      toast.error("Failed to confirm appointment. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelAppointment = async (appointmentId) => {
+    try {
+      setLoading(true);
+      const response = await appointmentService.updateAppointment(appointmentId, {
+        status: "cancelled"
+      });
+      
+      if (response.success) {
+        toast.success("Appointment cancelled successfully");
+        // Update the appointment in the local state
+        setAppointments(prevAppointments => 
+          prevAppointments.map(app => 
+            app._id === appointmentId ? { ...app, status: "cancelled" } : app
+          )
+        );
+      } else {
+        toast.error(response.message || "Failed to cancel appointment");
+      }
+    } catch (err) {
+      console.error("Error cancelling appointment:", err);
+      toast.error("Failed to cancel appointment. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -253,11 +330,17 @@ const Appointments = () => {
                   
                   {appointment.status === "scheduled" && (
                     <div className="flex gap-2">
-                      <button className="px-3 py-1.5 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors text-sm font-medium flex items-center gap-1">
+                      <button 
+                        onClick={() => handleConfirmAppointment(appointment._id)}
+                        className="px-3 py-1.5 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors text-sm font-medium flex items-center gap-1"
+                      >
                         <Check className="h-3.5 w-3.5" />
                         <span>Confirm</span>
                       </button>
-                      <button className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium flex items-center gap-1">
+                      <button 
+                        onClick={() => handleCancelAppointment(appointment._id)}
+                        className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium flex items-center gap-1"
+                      >
                         <X className="h-3.5 w-3.5" />
                         <span>Cancel</span>
                       </button>
@@ -269,8 +352,14 @@ const Appointments = () => {
           </div>
         )}
       </div>
+      
+      {/* New Appointment Dialog */}
+      <NewAppointmentDialog 
+        open={showNewAppointmentDialog} 
+        onOpenChange={setShowNewAppointmentDialog} 
+      />
     </div>
   );
 };
 
-export default Appointments; 
+export default Appointments;

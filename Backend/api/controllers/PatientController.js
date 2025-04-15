@@ -10,63 +10,171 @@ import prescriptionRoute from '../routes/PrescriptionRoute.js'; // Ensure this p
 // Register a new patient
 export const registerPatient = async (req, res) => {
   try {
-    console.log("Request received:", req.body);
-    const { name, email, gender, mobile, age, password, bloodGroup, height, weight } = req.body;
+    console.log("Request received for patient registration:", JSON.stringify(req.body, null, 2));
+    
+    // Extract user and patient data from request body
+    const { 
+      name, 
+      email, 
+      gender, 
+      mobile, 
+      password, 
+      dateOfBirth,
+      address,
+      bloodGroup, 
+      height, 
+      weight,
+      allergies,
+      conditions,
+      chronicDiseases,
+      medications,
+      surgeries,
+      medicalHistory,
+      emergencyContact,
+      insurance,
+      notes,
+      status
+    } = req.body;
 
-    // Check if the user already exists
-    let existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ success: false, message: "User with this email already exists" });
+    // Validate required fields
+    if (!email) {
+      console.log("Missing required field: email");
+      return res.status(400).json({ 
+        success: false, 
+        message: "Email is required" 
+      });
     }
 
-    // Create a new user first
-    const newUser = await User.create({
-      name,
-      email,
-      password: password || "password123", // Set a default password if not provided
-      role: "patient",
-      mobile,
-      gender,
-      dateOfBirth: new Date() // Add proper date of birth handling
+    if (!name) {
+      console.log("Missing required field: name");
+      return res.status(400).json({ 
+        success: false, 
+        message: "Name is required" 
+      });
+    }
+
+    // Debug log of the extracted values
+    console.log("Extracted fields:", {
+      name, email, gender, mobile, dateOfBirth,
+      bloodGroup, height, weight,
+      allergiesLength: allergies?.length,
+      chronicDiseasesLength: chronicDiseases?.length || conditions?.length,
+      medicationsLength: medications?.length
     });
 
-    // Now create a patient record linked to the user
-    const newPatient = await Patient.create({
-      user: newUser._id,
-      bloodGroup: bloodGroup || "O+", // Default blood group if not provided
-      height: height || 170, // Default height in cm
-      weight: weight || 70, // Default weight in kg
-      allergies: [],
-      chronicDiseases: [],
-      isActive: true
-    });
-
-    // Generate token for the new patient
-    const token = jwt.sign({ id: newUser._id }, process.env.JWT_SECRET || 'your_jwt_secret_key', {
-      expiresIn: '30d',
-    });
-
-    res.status(201).json({ 
-      success: true, 
-      message: "Patient registered successfully", 
-      token,
-      patientId: newPatient._id, // Include patient ID directly in the response
-      role: "patient",
-      data: {
-        user: {
-          _id: newUser._id,
-          userId: newUser.userId,
-          name: newUser.name,
-          email: newUser.email,
-          mobile: newUser.mobile,
-          gender: newUser.gender
-        },
-        patient: newPatient
+    // Check if the user already exists
+    console.log("Checking for existing user with email:", email);
+    let existingUser = await User.findOne({ email });
+    
+    let userId;
+    
+    try {
+      if (existingUser) {
+        console.log("Existing user found:", existingUser._id);
+        // If user exists but is not a patient, allow creating a patient profile
+        const existingPatient = await Patient.findOne({ user: existingUser._id });
+        if (existingPatient) {
+          console.log("Patient already exists for this user");
+          return res.status(400).json({ 
+            success: false, 
+            message: "Patient with this email already exists" 
+          });
+        }
+        
+        // Update existing user if needed
+        if (name) existingUser.name = name;
+        if (gender) existingUser.gender = gender;
+        if (mobile) existingUser.mobile = mobile;
+        if (dateOfBirth) existingUser.dateOfBirth = new Date(dateOfBirth);
+        if (address) existingUser.address = address;
+        
+        console.log("Updating existing user with new data");
+        await existingUser.save();
+        userId = existingUser._id;
+      } else {
+        // Create a new user
+        console.log("Creating new user with name:", name, "and email:", email);
+        try {
+          const newUser = new User({
+            name,
+            email,
+            password: password || "password123",
+            role: "patient",
+            mobile,
+            gender,
+            dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : new Date(),
+            address
+          });
+          
+          await newUser.save();
+          userId = newUser._id;
+          console.log("New user created with ID:", userId);
+        } catch (userError) {
+          console.error("Error creating user:", userError);
+          return res.status(400).json({
+            success: false,
+            message: "Error creating user",
+            error: userError.message
+          });
+        }
       }
-    });
+
+      // Now create a patient record linked to the user
+      console.log("Creating patient record for user:", userId);
+      
+      // Use either chronicDiseases or conditions based on what was provided
+      const chronicConditions = chronicDiseases || conditions || [];
+      
+      // Prepare patient data
+      const patientData = {
+        user: userId,
+        bloodGroup: bloodGroup || "O+",
+        height: height || 170,
+        weight: weight || 70,
+        allergies: allergies || [],
+        chronicDiseases: chronicConditions,
+        medications: medications || [],
+        medicalHistory: medicalHistory || [],
+        emergencyContact: emergencyContact || {},
+        insurance: insurance || {},
+        notes: notes || "",
+        isActive: status === "Inactive" ? false : true,
+        status: status || "Active"
+      };
+      
+      console.log("Patient data:", JSON.stringify(patientData, null, 2));
+      
+      const newPatient = new Patient(patientData);
+      await newPatient.save();
+      
+      console.log("New patient created with ID:", newPatient._id);
+
+      // Get the user details to include in response
+      const user = await User.findById(userId).select('-password');
+
+      return res.status(201).json({ 
+        success: true, 
+        message: "Patient registered successfully",
+        data: {
+          user,
+          patient: newPatient
+        }
+      });
+    } catch (specificError) {
+      console.error("Specific error in patient registration:", specificError);
+      return res.status(400).json({
+        success: false,
+        message: "Error in patient registration process",
+        error: specificError.message
+      });
+    }
   } catch (error) {
-    console.error("Error registering patient:", error);
-    res.status(500).json({ success: false, message: "Server error", error: error.message });
+    console.error("General error registering patient:", error);
+    return res.status(500).json({ 
+      success: false, 
+      message: "Server error", 
+      error: error.message 
+    });
   }
 };
 
@@ -225,6 +333,8 @@ export const deletePatient = async (req, res) => {
 };
 
 // Create patient profile
+import crypto from 'crypto';
+
 export const createPatient = async (req, res) => {
   try {
     const {
@@ -235,31 +345,49 @@ export const createPatient = async (req, res) => {
       allergies,
       chronicDiseases,
       emergencyContact,
-      insuranceDetails
+      insuranceDetails,
+      name,
+      email,
+      mobile,
+      gender,
+      dateOfBirth,
+      address,
+      password
     } = req.body;
     
     // Check if user exists
-    const user = await User.findById(userId);
+    let user = await User.findById(userId);
+
     if (!user) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "User not found" 
-      });
+      // If user doesn't exist, create a new user with missing fields handled
+      const newUserData = {
+        name: name || 'Default Name',  // Provide a default name if missing
+        email: email,
+        mobile: mobile || '1234567890',  // Provide a default mobile number if missing
+        gender: gender || 'male',  // Provide a default gender if missing
+        dateOfBirth: dateOfBirth || new Date('2000-01-01'),  // Default date if missing
+        address: address || { street: 'Default St', city: 'City', state: 'State', zipCode: '00000', country: 'Country' },
+        password: crypto.randomBytes(8).toString('hex'),  // Generate a random password if missing
+        role: 'patient',  // Default role as 'patient'
+      };
+
+      const newUser = await User.create(newUserData);
+      user = newUser;  // Assign the newly created user to the user variable
     }
-    
+
     // Check if patient profile already exists
     const existingPatient = await Patient.findOne({ user: userId });
     if (existingPatient) {
       return res.status(400).json({ 
-        success: false, 
+        success: false,
         message: "Patient profile already exists" 
       });
     }
     
     // Create patient profile
     const patient = await Patient.create({
-      user: userId,
-      bloodGroup,
+      user: user._id,
+      bloodGroup: bloodGroup || 'O+',  // Use the provided blood group or default to 'O+'
       height,
       weight,
       allergies: allergies || [],
@@ -272,68 +400,99 @@ export const createPatient = async (req, res) => {
   } catch (error) {
     console.error("Error creating patient:", error);
     res.status(500).json({ 
-      success: false, 
-      message: "Server error", 
+      success: false,
+      message: "Server error",
       error: error.message 
     });
   }
 };
 
+
+
 // Update patient profile
 export const updatePatient = async (req, res) => {
   try {
-    const {
-      bloodGroup,
-      height,
-      weight,
-      allergies,
-      chronicDiseases,
-      emergencyContact,
-      insuranceDetails
-    } = req.body;
-    
-    const patient = await Patient.findById(req.params.id);
+    const patient = await Patient.findById(req.params.id).populate('user');
     
     if (!patient) {
       return res.status(404).json({ 
-        success: false, 
+        success: false,
         message: "Patient not found" 
       });
     }
+
+    // Log the incoming request body for debugging
+    console.log('Update request body:', req.body);
     
-    // Check if user is authorized to update this patient
-    if (
-      req.user.role !== 'admin' && 
-      patient.user.toString() !== req.user._id.toString()
-    ) {
-      return res.status(403).json({ 
-        success: false, 
-        message: "Not authorized to update this patient" 
+    // Update user fields if they exist in the request
+    if (patient.user && req.body.user) {
+      const userFields = req.body.user;
+      const allowedUserFields = ['name', 'email', 'mobile', 'gender', 'dateOfBirth', 'address'];
+
+      allowedUserFields.forEach(field => {
+        if (userFields[field] !== undefined && userFields[field] !== null && userFields[field] !== '') {
+          patient.user[field] = userFields[field];
+        }
+      });
+
+      await patient.user.save();
+    }
+
+    // Update patient fields if they exist in the request
+    const patientFields = [
+      'height',
+      'weight',
+      'allergies',
+      'notes',
+      'status',
+      'bloodGroup',  // Make sure this is included in the update list
+      'chronicDiseases'
+    ];
+
+    patientFields.forEach(field => {
+      const value = req.body[field];
+      if (value !== undefined && value !== null && value !== '') {
+        if (field === 'status') {
+          patient.isActive = value === 'Active'; // Update the isActive flag based on the status
+        } else {
+          patient[field] = value;
+        }
+      }
+    });
+
+    // Handle emergency contact separately since it's an object
+    if (req.body.emergencyContact) {
+      const emergencyFields = ['name', 'relationship', 'phone'];
+      patient.emergencyContact = patient.emergencyContact || {}; // Ensure the object exists
+
+      emergencyFields.forEach(field => {
+        if (
+          req.body.emergencyContact[field] !== undefined && 
+          req.body.emergencyContact[field] !== null && 
+          req.body.emergencyContact[field] !== ''
+        ) {
+          patient.emergencyContact[field] = req.body.emergencyContact[field];
+        }
       });
     }
-    
-    // Update fields
-    if (bloodGroup) patient.bloodGroup = bloodGroup;
-    if (height) patient.height = height;
-    if (weight) patient.weight = weight;
-    if (allergies) patient.allergies = allergies;
-    if (chronicDiseases) patient.chronicDiseases = chronicDiseases;
-    if (emergencyContact) {
-      patient.emergencyContact = {
-        ...patient.emergencyContact,
-        ...emergencyContact
-      };
-    }
-    if (insuranceDetails) {
-      patient.insuranceDetails = {
-        ...patient.insuranceDetails,
-        ...insuranceDetails
-      };
-    }
-    
+
+    // Log the patient object before saving for debugging
+    console.log('Patient object before save:', patient);
+
     const updatedPatient = await patient.save();
     
-    res.status(200).json({ success: true, data: updatedPatient });
+    // Fetch the updated patient with populated user data
+    const populatedPatient = await Patient.findById(updatedPatient._id)
+      .populate('user', 'name email mobile gender dateOfBirth address');
+    
+    // Log the response data for debugging
+    console.log('Response data:', populatedPatient);
+
+    res.status(200).json({ 
+      success: true, 
+      data: populatedPatient,
+      message: 'Patient updated successfully'
+    });
   } catch (error) {
     console.error("Error updating patient:", error);
     res.status(500).json({ 
@@ -343,6 +502,7 @@ export const updatePatient = async (req, res) => {
     });
   }
 };
+
 
 // Add medical history to patient
 export const addMedicalHistory = async (req, res) => {

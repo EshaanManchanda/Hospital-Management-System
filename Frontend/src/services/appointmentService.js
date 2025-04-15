@@ -42,11 +42,45 @@ const appointmentService = {
    */
   createAppointment: async (appointmentData) => {
     try {
-      const response = await api.post('/api/appointments', appointmentData);
+      // Process the appointment data to ensure symptoms is a string
+      const processedData = {
+        ...appointmentData,
+        // Ensure symptoms is always a string, never an empty array
+        symptoms: Array.isArray(appointmentData.symptoms) 
+          ? (appointmentData.symptoms.length > 0 ? appointmentData.symptoms.join(', ') : '') 
+          : (appointmentData.symptoms || '')
+      };
+      
+      console.log('Creating appointment with processed data:', processedData);
+      
+      // Get the authentication token from localStorage
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('No authentication token found when creating appointment');
+        return {
+          success: false,
+          message: 'Authentication required'
+        };
+      }
+      
+      // Set authorization header
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      
+      const response = await api.post('/api/appointments', processedData);
       return response.data;
     } catch (error) {
       console.error('Create appointment error:', error);
-      throw error;
+      console.error('Error details:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        responseData: error.response?.data
+      });
+      
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Failed to create appointment'
+      };
     }
   },
 
@@ -105,28 +139,42 @@ const appointmentService = {
    * @param {number} limit - Items per page
    * @returns {Promise<Object>} Appointment list with pagination info
    */
-  getPatientAppointments: async (patientId, page = 1, limit = 10) => {
+  getPatientAppointments: async (page = 1, limit = 10) => {
     try {
-      console.log(`Fetching appointments for patient: ${patientId}`);
+      console.log(`Fetching appointments for current patient`);
       
       // Get the authentication token from localStorage
       const token = localStorage.getItem('token');
       if (!token) {
         console.error('No authentication token found when fetching patient appointments');
-        throw new Error('Authentication required');
+        return {
+          success: false,
+          message: 'Authentication required'
+        };
       }
       
-      // Make the API request with the authorization header
-      // The backend filters appointments for the authenticated patient in the /appointments endpoint
-      // So we use the main appointments endpoint instead of a patient-specific one
-      const response = await api.get(`/api/appointments?page=${page}&limit=${limit}`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+      // Set authorization header
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      
+      // The backend will filter appointments for the authenticated patient
+      const response = await api.get(`/api/appointments?page=${page}&limit=${limit}`);
       
       console.log('Patient appointments response:', response.data);
-      return response.data;
+      
+      if (response.data && response.data.success) {
+        return {
+          success: true,
+          data: response.data.data || [],
+          count: response.data.count || 0,
+          message: response.data.message || 'Appointments retrieved successfully'
+        };
+      }
+      
+      return {
+        success: false,
+        data: [],
+        message: response.data?.message || 'Failed to fetch appointments'
+      };
     } catch (error) {
       console.error('Get patient appointments error:', error);
       console.error('Error details:', {
@@ -136,7 +184,12 @@ const appointmentService = {
         responseData: error.response?.data,
         endpoint: `/api/appointments?page=${page}&limit=${limit}`
       });
-      throw error;
+      
+      return {
+        success: false,
+        data: [],
+        message: error.response?.data?.message || error.message || 'Failed to fetch appointments'
+      };
     }
   },
 
@@ -157,4 +210,18 @@ const appointmentService = {
   }
 };
 
-export default appointmentService; 
+export default appointmentService;
+
+// Add this method to your appointmentService.js if it doesn't exist
+export const updateAppointment = async (appointmentId, updateData) => {
+  try {
+    const response = await api.put(`/appointments/${appointmentId}`, updateData);
+    return response.data;
+  } catch (error) {
+    console.error("Error updating appointment:", error);
+    return {
+      success: false,
+      message: error.response?.data?.message || "Failed to update appointment"
+    };
+  }
+};

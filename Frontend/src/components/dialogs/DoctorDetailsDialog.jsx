@@ -4,7 +4,8 @@ import {
   DialogContent, 
   DialogHeader, 
   DialogTitle, 
-  DialogFooter 
+  DialogFooter,
+  DialogDescription
 } from "@/components/admin/ui/dialog";
 import { Button } from "@/components/admin/ui/button";
 import { ScrollArea } from "@/components/admin/ui/scroll-area";
@@ -22,10 +23,15 @@ import {
   Edit, 
   Trash
 } from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/admin/ui/avatar";
 import { cn } from "@/lib/utils";
+import { Separator } from "@/components/admin/ui/separator";
 
-const DoctorDetailsDialog = ({ open, onOpenChange, doctor, onEdit, onDelete }) => {
+const DoctorDetailsDialog = ({ open, onOpenChange, onClose, doctor, onEdit, onDelete }) => {
   if (!doctor) return null;
+
+  // Add debugging log to see the doctor data structure
+  console.log("Doctor data in details dialog:", doctor);
 
   // Helper function to render safe items as a list
   const renderList = (items, emptyMessage) => {
@@ -71,252 +77,156 @@ const DoctorDetailsDialog = ({ open, onOpenChange, doctor, onEdit, onDelete }) =
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+    <Dialog 
+      open={open} 
+      onOpenChange={(isOpen) => {
+        if (!isOpen && typeof onClose === "function") {
+          onClose();
+        }
+      }}
+    >
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-auto">
         <DialogHeader>
-          <DialogTitle>Doctor Profile</DialogTitle>
+          <DialogTitle className="text-2xl">
+            Dr. {doctor?.name || "Unknown Doctor"}
+          </DialogTitle>
+          <DialogDescription>
+            {doctor?.specialization || "General Physician"} 
+            {doctor?.experience > 0 && ` • ${doctor.experience} years of experience`}
+          </DialogDescription>
         </DialogHeader>
-
-        <ScrollArea className="flex-grow pr-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Profile Section */}
-            <div className="md:col-span-1 flex flex-col items-center">
-              <div className="w-32 h-32 rounded-full bg-gray-200 overflow-hidden mb-4">
-                <img 
-                  src={doctor.user?.profileImage || doctor.user?.picture || "/assets/default-doctor.jpg"} 
-                  alt={doctor.user?.name || "Doctor"} 
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = "/assets/default-doctor.jpg";
-                  }}
-                />
-              </div>
-              
-              <h3 className="text-xl font-semibold text-center">{doctor.user?.name || "Unknown Doctor"}</h3>
-              <p className="text-primary mb-4">{doctor.specialization}</p>
-              
-              <div className="w-full space-y-2">
-                <Badge 
-                  className={cn(
-                    "w-full flex justify-center py-1",
-                    doctor.isAvailable 
-                      ? "bg-green-100 text-green-800 hover:bg-green-100" 
-                      : "bg-amber-100 text-amber-800 hover:bg-amber-100"
-                  )}
-                >
-                  {doctor.isAvailable ? "Available" : "Not Available"}
-                </Badge>
-                
-                <div className="flex items-center space-x-2">
-                  <Briefcase className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">{doctor.experience} years experience</span>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">{doctor.patients?.length || 0} patients</span>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">{doctor.user?.email || "No email provided"}</span>
-                </div>
-                
-                {doctor.user?.mobile && (
-                  <div className="flex items-center space-x-2">
-                    <Phone className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">{doctor.user.mobile}</span>
-                  </div>
+        
+        {/* Doctor Details Content */}
+        <div className="space-y-6 py-4">
+          {/* Basic Information */}
+          <div className="flex flex-col md:flex-row gap-8">
+            <div className="md:w-1/3 flex flex-col items-center">
+              <Avatar className="w-32 h-32 mb-4">
+                {doctor?.profileImage ? (
+                  <AvatarImage src={doctor.profileImage} alt={doctor?.name} />
+                ) : doctor?.picture ? (
+                  <AvatarImage src={doctor.picture} alt={doctor?.name} />
+                ) : (
+                  <AvatarFallback className="bg-primary/10 text-primary text-3xl">
+                    {doctor?.name?.split(' ').map(n => n[0]).join('') || 'DR'}
+                  </AvatarFallback>
                 )}
-                
-                {doctor.user?.address && (
-                  <div className="flex items-start space-x-2">
-                    <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
-                    <span className="text-sm">
-                      {typeof doctor.user.address === 'string' 
-                        ? doctor.user.address 
-                        : [
-                            doctor.user.address.street,
-                            doctor.user.address.city,
-                            doctor.user.address.state,
-                            doctor.user.address.zipCode,
-                            doctor.user.address.country
-                          ].filter(Boolean).join(', ')
-                      }
-                    </span>
-                  </div>
-                )}
+              </Avatar>
+              
+              <Badge className="mb-2" variant={doctor?.isAvailable ? "default" : "secondary"}>
+                {doctor?.isAvailable ? "Available" : "Not Available"}
+              </Badge>
+              
+              <div className="text-center mt-2">
+                <p className="text-sm flex items-center justify-center gap-2 mb-1">
+                  <Mail className="h-4 w-4" />
+                  {doctor?.email || "No email provided"}
+                </p>
+                <p className="text-sm flex items-center justify-center gap-2">
+                  <Phone className="h-4 w-4" />
+                  {doctor?.mobile || "No phone provided"}
+                </p>
               </div>
             </div>
             
-            {/* Information Tabs */}
-            <div className="md:col-span-2">
-              <Tabs defaultValue="overview">
-                <TabsList className="grid grid-cols-3 mb-4">
-                  <TabsTrigger value="overview">Overview</TabsTrigger>
-                  <TabsTrigger value="contact">Contact</TabsTrigger>
-                  <TabsTrigger value="schedule">Schedule</TabsTrigger>
-                </TabsList>
-                
-                {/* Overview Tab */}
-                <TabsContent value="overview" className="space-y-4">
-                  {doctor.about && (
-                    <div>
-                      <h4 className="font-medium mb-1">About</h4>
-                      <p className="text-sm text-muted-foreground">{doctor.about}</p>
-                    </div>
+            <div className="md:w-2/3 space-y-4">
+              <div>
+                <h3 className="text-lg font-medium mb-2">About</h3>
+                <p className="text-muted-foreground">
+                  {doctor?.about || "No information provided."}
+                </p>
+              </div>
+              
+              <div>
+                <h3 className="text-lg font-medium mb-2">Contact Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div>
+                    <h4 className="text-sm font-medium">Email</h4>
+                    <p className="text-muted-foreground">{doctor?.email || "Not provided"}</p>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-medium">Phone</h4>
+                    <p className="text-muted-foreground">{doctor?.mobile || "Not provided"}</p>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-medium">Gender</h4>
+                    <p className="text-muted-foreground capitalize">{doctor?.gender || "Not specified"}</p>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-medium">Consultation Fee</h4>
+                    <p className="text-muted-foreground">${doctor?.fee || "0"}</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div>
+                <h3 className="text-lg font-medium mb-2">Address</h3>
+                <p className="text-muted-foreground">
+                  {doctor?.address?.street ? (
+                    <>
+                      {doctor.address.street}, {doctor.address.city}, {doctor.address.state}, {doctor.address.zipCode}, {doctor.address.country}
+                    </>
+                  ) : (
+                    "No address provided"
                   )}
-                  
-                  <div>
-                    <h4 className="font-medium mb-1">Specialization</h4>
-                    <p className="text-sm">{doctor.specialization}</p>
-                  </div>
-                  
-                  <div>
-                    <h4 className="font-medium mb-1">Experience</h4>
-                    <p className="text-sm">{doctor.experience} years</p>
-                  </div>
-                  
-                  <div>
-                    <h4 className="font-medium mb-1">Consultation Fee</h4>
-                    <p className="text-sm">${doctor.fee}</p>
-                  </div>
-                  
-                  <div>
-                    <h4 className="font-medium mb-1">Education & Qualifications</h4>
-                    {doctor.qualifications && doctor.qualifications.length > 0 ? (
-                      <ul className="list-disc pl-5 space-y-1">
-                        {doctor.qualifications.map((qual, index) => (
-                          <li key={index} className="text-sm">
-                            {qual.degree} - {qual.institution}, {qual.year}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-sm text-muted-foreground italic">No qualifications listed</p>
-                    )}
-                  </div>
-                  
-                  {doctor.certifications && doctor.certifications.length > 0 && (
-                    <div>
-                      <h4 className="font-medium mb-1">Certifications</h4>
-                      {renderList(doctor.certifications, "No certifications listed")}
-                    </div>
-                  )}
-                </TabsContent>
-                
-                {/* Contact Tab */}
-                <TabsContent value="contact" className="space-y-4">
-                  <div>
-                    <h4 className="font-medium mb-1">Email</h4>
-                    <p className="text-sm">{doctor.user?.email || "No email provided"}</p>
-                  </div>
-                  
-                  <div>
-                    <h4 className="font-medium mb-1">Phone</h4>
-                    <p className="text-sm">{doctor.user?.mobile || "No phone provided"}</p>
-                  </div>
-                  
-                  <div>
-                    <h4 className="font-medium mb-1">Address</h4>
-                    {doctor.user?.address ? (
-                      <p className="text-sm">
-                        {typeof doctor.user.address === 'string' 
-                          ? doctor.user.address 
-                          : [
-                              doctor.user.address.street,
-                              doctor.user.address.city,
-                              doctor.user.address.state,
-                              doctor.user.address.zipCode,
-                              doctor.user.address.country
-                            ].filter(Boolean).join(', ')
-                        }
-                      </p>
-                    ) : (
-                      <p className="text-sm text-muted-foreground italic">No address provided</p>
-                    )}
-                  </div>
-                  
-                  {doctor.user?.dateOfBirth && (
-                    <div>
-                      <h4 className="font-medium mb-1">Date of Birth</h4>
-                      <div className="flex items-center space-x-2">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">
-                          {new Date(doctor.user.dateOfBirth).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {doctor.user?.gender && (
-                    <div>
-                      <h4 className="font-medium mb-1">Gender</h4>
-                      <p className="text-sm capitalize">{doctor.user.gender}</p>
-                    </div>
-                  )}
-                </TabsContent>
-                
-                {/* Schedule Tab */}
-                <TabsContent value="schedule" className="space-y-4">
-                  <div>
-                    <h4 className="font-medium mb-1">Working Hours</h4>
-                    {renderSchedule({
-                      workingDays: doctor.workingDays || [],
-                      workingHours: doctor.workingHours || {}
-                    })}
-                  </div>
-                  
-                  <div>
-                    <h4 className="font-medium mb-1">Availability Status</h4>
-                    <Badge 
-                      className={cn(
-                        "py-1",
-                        doctor.isAvailable 
-                          ? "bg-green-100 text-green-800 hover:bg-green-100" 
-                          : "bg-amber-100 text-amber-800 hover:bg-amber-100"
-                      )}
-                    >
-                      {doctor.isAvailable ? "Available" : "Not Available"}
-                    </Badge>
-                  </div>
-                  
-                  <div>
-                    <h4 className="font-medium mb-1">Current Patient Count</h4>
-                    <p className="text-sm">{doctor.patients?.length || 0} patients</p>
-                  </div>
-                </TabsContent>
-              </Tabs>
+                </p>
+              </div>
             </div>
           </div>
-        </ScrollArea>
-        
-        <DialogFooter className="pt-4 flex flex-col sm:flex-row gap-2">
-          <Button 
-            variant="outline" 
-            onClick={() => onOpenChange(false)}
-          >
-            Close
-          </Button>
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              onClick={onEdit}
-              className="flex items-center"
-            >
-              <Edit className="h-4 w-4 mr-2" />
-              Edit
-            </Button>
-            <Button 
-              variant="destructive" 
-              onClick={onDelete}
-              className="flex items-center"
-            >
-              <Trash className="h-4 w-4 mr-2" />
-              Delete
-            </Button>
+          
+          {/* Professional Information */}
+          <Separator />
+          
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium">Professional Information</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h4 className="text-sm font-medium mb-2">Working Hours</h4>
+                <p className="text-muted-foreground">
+                  {doctor?.workingHours?.start && doctor?.workingHours?.end ? (
+                    `${doctor.workingHours.start} - ${doctor.workingHours.end}`
+                  ) : (
+                    "Not specified"
+                  )}
+                </p>
+              </div>
+              
+              <div>
+                <h4 className="text-sm font-medium mb-2">Working Days</h4>
+                <div className="flex flex-wrap gap-1">
+                  {doctor?.workingDays && doctor.workingDays.length > 0 ? (
+                    doctor.workingDays.map(day => (
+                      <Badge key={day} variant="outline">{day}</Badge>
+                    ))
+                  ) : (
+                    <p className="text-muted-foreground">Not specified</p>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            <div>
+              <h4 className="text-sm font-medium mb-2">Qualifications</h4>
+              {doctor?.qualifications && doctor.qualifications.length > 0 ? (
+                <div className="space-y-2">
+                  {doctor.qualifications.map((qual, index) => (
+                    <div key={index} className="border rounded-md p-3">
+                      <p className="font-medium">{qual.degree}</p>
+                      <p className="text-sm text-muted-foreground">{qual.institution}, {qual.year}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground">No qualifications listed</p>
+              )}
+            </div>
           </div>
+        </div>
+        
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Close</Button>
+          <Button onClick={onEdit}>Edit Doctor</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

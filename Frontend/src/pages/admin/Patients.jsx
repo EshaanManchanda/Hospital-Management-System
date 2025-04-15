@@ -271,7 +271,7 @@ const Patients = () => {
     setCurrentFilter(filter);
   };
 
-  const handleSavePatient = async (patientData, mode) => {
+  const handleSavePatient = async (patientData) => {
     if (!patientService) {
       const module = await import('../../services/patientService');
       patientService = module.default;
@@ -281,33 +281,62 @@ const Patients = () => {
       setLoading(true);
       let response;
       
-      if (mode === "add") {
-        response = await patientService.createPatient(patientData);
+      // Format the data to match backend expectations
+      const formattedData = {
+        // User related fields
+        name: patientData.user.name,
+        email: patientData.user.email,
+        mobile: patientData.user.mobile,
+        gender: patientData.user.gender,
+        dateOfBirth: patientData.user.dateOfBirth,
+        address: patientData.user.address,
+        
+        // Patient specific fields
+        bloodGroup: patientData.bloodType || patientData.bloodGroup, // Support both field names
+        height: patientData.height,
+        weight: patientData.weight,
+        allergies: patientData.allergies || [],
+        chronicDiseases: patientData.chronicConditions || [],
+        medications: patientData.medications || [],
+        medicalHistory: patientData.medicalHistory || [],
+        emergencyContact: patientData.emergencyContact,
+        notes: patientData.notes,
+        status: patientData.status
+      };
+      
+      console.log('Formatted data for API:', formattedData);
+      
+      if (formMode === "add") {
+        response = await patientService.createPatient(formattedData);
         
         if (response.success) {
           // Add the new patient to the list
-          setPatients([...patients, response.patient]);
+          setPatients([...patients, response.data || response.patient]);
           
           toast({
             title: "Patient Added",
-            description: `${patientData.name} has been added successfully.`,
+            description: `${formattedData.name} has been added successfully.`,
           });
+          
+          // Close the form dialog
+          setPatientFormOpen(false);
+          return { success: true };
         } else {
           toast({
             title: "Error",
             description: response.message || "Failed to add patient",
             variant: "destructive",
           });
-          return; // Don't close the dialog if there was an error
+          return { success: false, message: response.message };
         }
       } else {
-        response = await patientService.updatePatient(selectedPatient._id, patientData);
+        response = await patientService.updatePatient(selectedPatient._id, formattedData);
         
         if (response.success) {
           // Update the patient in the list
           const updatedPatients = patients.map(patient => {
             if (patient._id === selectedPatient._id) {
-              return response.patient;
+              return response.data || response.patient;
             }
             return patient;
           });
@@ -316,26 +345,29 @@ const Patients = () => {
           
           toast({
             title: "Patient Updated",
-            description: `${patientData.name}'s information has been updated.`,
+            description: `${formattedData.name}'s information has been updated.`,
           });
+          
+          // Close the form dialog
+          setPatientFormOpen(false);
+          return { success: true };
         } else {
           toast({
             title: "Error",
             description: response.message || "Failed to update patient",
             variant: "destructive",
           });
-          return; // Don't close the dialog if there was an error
+          return { success: false, message: response.message };
         }
       }
-      
-      // Close the form dialog
-      setPatientFormOpen(false);
     } catch (error) {
+      console.error('Error saving patient:', error);
       toast({
         title: "Error",
         description: "An unexpected error occurred",
         variant: "destructive",
       });
+      return { success: false, message: error.message };
     } finally {
       setLoading(false);
     }
@@ -566,7 +598,7 @@ const Patients = () => {
         onOpenChange={setPatientFormOpen}
         patient={selectedPatient}
         mode={formMode}
-        onSave={(data) => handleSavePatient(data, formMode)}
+        onSave={(data) => handleSavePatient(data)}
       />
       
       {/* View Patient Dialog */}

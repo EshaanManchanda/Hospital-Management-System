@@ -12,22 +12,30 @@ import notificationService from './notificationService';
 import reportService from './reportService';
 import revenueService from './revenueService';
 
-// Import patientService with a dynamically resolved promise to avoid circular dependencies
+// Initialize services that need dynamic loading
 let api, patientService;
 
-// Dynamically import the api and patientService
+// Export API getter to ensure it's loaded when accessed
+export const getApi = () => api;
+export const getPatientService = () => patientService;
+
 const loadDependencies = async () => {
-  const apiModule = await import('../utils/api');
-  api = apiModule.default;
-  
-  const patientServiceModule = await import('./patientService');
-  patientService = patientServiceModule.default;
+  try {
+    const apiModule = await import('../utils/api');
+    api = apiModule.default;
+    
+    const patientServiceModule = await import('./patientService');
+    patientService = patientServiceModule.default;
+  } catch (error) {
+    console.error('Error loading dependencies:', error);
+    throw error;
+  }
 };
 
 // Start loading dependencies
 loadDependencies();
 
-// Export the api instance and all services
+// Export all services
 export {
   authService,
   doctorService,
@@ -42,7 +50,3 @@ export {
   reportService,
   revenueService
 };
-
-// Export these with getters to ensure they're loaded when accessed
-export const getApi = () => api;
-export const getPatientService = () => patientService; 

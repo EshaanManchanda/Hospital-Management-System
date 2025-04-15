@@ -94,21 +94,79 @@ const Doctors = () => {
     setCurrentPage(1); // Reset to first page when filters change
   }, [filteredDoctors, doctorsPerPage]);
 
+  // Function to sync local doctor data with latest from backend
+  const syncDoctorData = (fetchedDoctors) => {
+    try {
+      // Get the IDs of all doctors in the backend
+      const backendIds = fetchedDoctors.map(doctor => doctor._id);
+      
+      // Get the IDs of all doctors in our state
+      const stateIds = doctors.map(doctor => doctor._id);
+      
+      // Find doctors that exist in state but not in backend (they were deleted)
+      const deletedIds = stateIds.filter(id => !backendIds.includes(id));
+      if (deletedIds.length > 0) {
+        console.log('Found deleted doctors:', deletedIds);
+        
+        // Remove deleted doctors from state
+        setDoctors(prevDoctors => 
+          prevDoctors.filter(doctor => !deletedIds.includes(doctor._id))
+        );
+        
+        // If we're currently viewing/editing a deleted doctor, close dialogs
+        if (selectedDoctor && deletedIds.includes(selectedDoctor._id)) {
+          toast({
+            variant: "warning",
+            title: "Doctor Deleted",
+            description: "The doctor you were viewing has been deleted from the database."
+          });
+          handleCloseAllDialogs();
+        }
+      }
+      
+      // Find doctors that exist in backend but not in state (they were added)
+      const addedIds = backendIds.filter(id => !stateIds.includes(id));
+      if (addedIds.length > 0) {
+        console.log('Found new doctors:', addedIds);
+      }
+      
+      // Update doctor data
+      setDoctors(fetchedDoctors);
+    } catch (error) {
+      console.error('Error syncing doctor data:', error);
+    }
+  };
+
   const fetchDoctors = async () => {
     setIsLoading(true);
     try {
+      console.log('Fetching doctors from API...');
       const response = await doctorService.getAllDoctors();
       
       // Handle the response regardless of success status
-      if (response && response.doctors) {
-        setDoctors(response.doctors);
+      if (response && response.success && response.data) {
+        console.log(`Successfully fetched ${response.data.length} doctors`);
+        
+        // Log doctors with their IDs for debugging
+        response.data.forEach((doctor, index) => {
+          console.log(`Doctor ${index + 1}:`, doctor._id, 
+            'User:', doctor.user ? {
+              name: doctor.user.name,
+              email: doctor.user.email,
+              _id: doctor.user._id
+            } : 'No user data', 
+            'Specialization:', doctor.specialization);
+        });
+        
+        // Sync with local state and handle deleted/added doctors
+        syncDoctorData(response.data);
         
         // Extract unique specialties for filtering
         const specialtySet = new Set();
         specialtySet.add("All Specializations");
         
         // Add specialties if available
-        response.doctors.forEach(doctor => {
+        response.data.forEach(doctor => {
           if (doctor && doctor.specialization) {
             specialtySet.add(doctor.specialization);
           }
@@ -117,15 +175,25 @@ const Doctors = () => {
         // Convert set to array
         setSpecialties(Array.from(specialtySet));
         
-        if (response.success) {
-          toast.success('Doctors loaded successfully');
-        }
+        toast({
+          title: "Success",
+          description: `${response.data.length} doctors loaded successfully`
+        });
       } else {
-        toast.error('Failed to load doctors: ' + (response.message || 'Unknown error'));
+        console.error('Failed to fetch doctors:', response);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: response.message || 'Failed to load doctors'
+        });
       }
     } catch (error) {
       console.error('Error fetching doctors:', error);
-      toast.error('Error loading doctors: ' + (error.message || 'Unknown error'));
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || 'Failed to load doctors'
+      });
     } finally {
       setIsLoading(false);
     }
@@ -138,9 +206,10 @@ const Doctors = () => {
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
       result = result.filter(doctor => 
-        (doctor.user?.firstName + ' ' + doctor.user?.lastName)?.toLowerCase().includes(searchLower) ||
+        doctor.user?.name?.toLowerCase().includes(searchLower) ||
         doctor.specialization?.toLowerCase().includes(searchLower) ||
-        doctor.licenseNumber?.toLowerCase().includes(searchLower)
+        doctor.user?.email?.toLowerCase().includes(searchLower) ||
+        doctor._id?.toLowerCase().includes(searchLower)
       );
     }
     
@@ -151,9 +220,9 @@ const Doctors = () => {
     
     // Apply status filter
     if (selectedSpecialty === "Active") {
-      result = result.filter(doctor => doctor.status === true);
+      result = result.filter(doctor => doctor.isActive === true);
     } else if (selectedSpecialty === "Not Active") {
-      result = result.filter(doctor => doctor.status === false);
+      result = result.filter(doctor => doctor.isActive === false);
     }
     
     // Apply availability filter
@@ -193,8 +262,58 @@ const Doctors = () => {
   };
 
   const handleEditDoctor = (doctor) => {
-    setSelectedDoctor(doctor);
-    setShowEditDialog(true);
+    // Add debug logging to examine the doctor object
+    console.log('Selected doctor for editing:', doctor);
+    
+    // Verify we have a valid ID - doctor._id is the primary ID to use now, based on sample data
+    const doctorId = doctor._id;
+    
+    if (!doctorId) {
+      console.error('Doctor object is missing _id:', doctor);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Cannot edit doctor: Missing ID"
+      });
+      return;
+    }
+    
+    // Set to loading state
+    setIsLoading(true);
+    
+    // Check if doctor exists or can be created
+    doctorService.checkDoctorExists(doctorId)
+      .then(exists => {
+        setIsLoading(false);
+        
+        if (exists) {
+          // Doctor exists or can be created
+          setSelectedDoctor(doctor);
+          setShowEditDialog(true);
+        } else {
+          // Doctor doesn't exist and can't be created
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "This doctor no longer exists in the database. The list will be refreshed."
+          });
+          
+          // Remove doctor from local state
+          setDoctors(prevDoctors => prevDoctors.filter(d => d._id !== doctorId));
+          
+          // Refresh doctors list
+          fetchDoctors();
+        }
+      })
+      .catch(error => {
+        setIsLoading(false);
+        console.error('Error checking if doctor exists:', error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to validate doctor information. Please try again."
+        });
+      });
   };
 
   const handleDeleteDoctor = (doctor) => {
@@ -202,51 +321,74 @@ const Doctors = () => {
     setShowDeleteDialog(true);
   };
 
-  const handleSaveDoctor = async (formData) => {
+  const handleSaveDoctor = async (idOrData, formData) => {
     setIsLoading(true);
     try {
-      if (selectedDoctor && selectedDoctor._id) {
-        // Update existing doctor
-        const response = await doctorService.updateDoctor(selectedDoctor._id, formData);
+      let response;
+
+      // Check if this is an update (two parameters) or create (one parameter)
+      if (formData) {
+        // This is an update operation - first parameter is ID, second is data
+        console.log('Updating doctor with ID:', idOrData);
+        console.log('Form data for update:', formData);
         
-        if (response.success) {
-          toast({
-            title: "Doctor Updated",
-            description: "Doctor information has been updated successfully.",
-          });
-          fetchDoctors();
-        } else {
-          toast({
-            variant: "destructive",
-            title: "Update Failed",
-            description: response.message || "Failed to update doctor information.",
-          });
-        }
+        // Format the data based on the expected structure for update
+        // The data should be flat without nested user properties
+        const formattedData = {
+          ...formData,
+          // Ensure these required fields have defaults
+          specialization: formData.specialization || "General Physician",
+          fee: parseFloat(formData.fee) || 0,
+          experience: parseInt(formData.experience) || 0,
+        };
+        
+        console.log('Formatted update data:', formattedData);
+        response = await doctorService.updateDoctor(idOrData, formattedData);
       } else {
-        // Add new doctor
-        const response = await doctorService.createDoctor(formData);
+        // This is a create operation - first parameter is data
+        console.log('Creating new doctor');
+        console.log('Form data for create:', idOrData);
         
-        if (response.success) {
-          toast({
-            title: "Doctor Added",
-            description: "New doctor has been added successfully.",
-          });
-          fetchDoctors();
-        } else {
-          toast({
-            variant: "destructive",
-            title: "Addition Failed",
-            description: response.message || "Failed to add new doctor.",
-          });
-        }
+        // Format the data for creating a new doctor
+        // The data should be flat without nested user properties
+        const formattedData = {
+          ...idOrData,
+          // Ensure these required fields have defaults
+          specialization: idOrData.specialization || "General Physician",
+          fee: parseFloat(idOrData.fee) || 0,
+          experience: parseInt(idOrData.experience) || 0,
+        };
+        
+        console.log('Formatted create data:', formattedData);
+        response = await doctorService.createDoctor(formattedData);
       }
-      handleCloseAllDialogs();
+      
+      if (response.success) {
+        toast({
+          title: formData ? "Doctor Updated" : "Doctor Added",
+          description: formData 
+            ? "Doctor information has been updated successfully." 
+            : "New doctor has been added successfully.",
+        });
+        fetchDoctors(); // Refresh the doctor list
+        handleCloseAllDialogs();
+      } else {
+        // Handle errors
+        toast({
+          variant: "destructive",
+          title: formData ? "Update Failed" : "Addition Failed",
+          description: response.error 
+            ? `${response.message}: ${response.error}` 
+            : response.message || "Failed to process doctor information.",
+        });
+        console.error('Doctor operation error details:', response);
+      }
     } catch (error) {
-      console.error("Error saving doctor:", error);
+      console.error('Error in handleSaveDoctor:', error);
       toast({
         variant: "destructive",
         title: "Operation Failed",
-        description: "An unexpected error occurred. Please try again.",
+        description: error.message || "An unexpected error occurred."
       });
     } finally {
       setIsLoading(false);
@@ -314,8 +456,8 @@ const Doctors = () => {
 
   // Helper to get doctor name from associated user
   const getDoctorName = (doctor) => {
-    // Check for direct name property first, then check for nested user property
-    return doctor.name || (doctor.user?.name) || "Unknown Doctor";
+    // Use name directly from doctor object
+    return doctor.name || "Unknown Doctor";
   };
 
   // Helper to get doctor availability status
@@ -325,12 +467,12 @@ const Doctors = () => {
 
   // Helper to get doctor's image
   const getDoctorImage = (doctor) => {
-    return doctor.profileImage || doctor.user?.profileImage || doctor.user?.picture || DEFAULT_DOCTOR_IMAGE;
+    return doctor.profileImage || doctor.picture || DEFAULT_DOCTOR_IMAGE;
   };
 
   // Helper to get doctor status
   const getDoctorStatus = (doctor) => {
-    return doctor.status ? "Active" : "Not Active";
+    return doctor.isActive ? "Active" : "Not Active";
   };
 
   // Get paginated doctors
@@ -344,10 +486,17 @@ const Doctors = () => {
 
   // Handle close all dialogs
   const handleCloseAllDialogs = () => {
+    // Close all dialogs
     setShowAddDialog(false);
     setShowEditDialog(false);
     setShowViewDialog(false);
     setShowDeleteDialog(false);
+    
+    // Reset selected doctor
+    setSelectedDoctor(null);
+    
+    // Refresh doctor list to ensure up-to-date data
+    fetchDoctors();
   };
 
   // Render doctor grid
@@ -392,10 +541,12 @@ const Doctors = () => {
                 <div className="flex justify-between">
                   <Avatar className="h-16 w-16 mb-4">
                     {doctor.profileImage ? (
-                      <AvatarImage src={doctor.profileImage} alt={doctor.user?.firstName} />
+                      <AvatarImage src={doctor.profileImage} alt={doctor.name} />
+                    ) : doctor.picture ? (
+                      <AvatarImage src={doctor.picture} alt={doctor.name} />
                     ) : (
                       <AvatarFallback className="bg-primary/10 text-primary text-lg">
-                        {doctor.user?.firstName?.charAt(0)}{doctor.user?.lastName?.charAt(0)}
+                        {doctor.name?.split(' ').map(n => n[0]).join('') || 'DR'}
                       </AvatarFallback>
                     )}
                   </Avatar>
@@ -408,18 +559,18 @@ const Doctors = () => {
                 </div>
                 
                 <h3 className="font-semibold text-lg">
-                  Dr. {doctor.user?.firstName} {doctor.user?.lastName}
+                  Dr. {doctor.name || "Unknown Doctor"}
                 </h3>
                 <p className="text-muted-foreground text-sm mb-2">
-                  {doctor.specialization}
+                  {doctor.specialization || "General Physician"}
                 </p>
                 <p className="text-sm flex items-center gap-2 mb-1">
                   <Mail className="h-3.5 w-3.5 text-muted-foreground" />
-                  {doctor.user?.email || "No email provided"}
+                  {doctor.email || "No email provided"}
                 </p>
                 <p className="text-sm flex items-center gap-2">
                   <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                  {doctor.user?.phone || "No phone provided"}
+                  {doctor.mobile || "No phone provided"}
                 </p>
               </div>
               
@@ -528,20 +679,22 @@ const Doctors = () => {
                   <div className="flex items-center gap-3">
                     <Avatar className="h-9 w-9">
                       {doctor.profileImage ? (
-                        <AvatarImage src={doctor.profileImage} alt={doctor.user?.firstName} />
+                        <AvatarImage src={doctor.profileImage} alt={doctor.name} />
+                      ) : doctor.picture ? (
+                        <AvatarImage src={doctor.picture} alt={doctor.name} />
                       ) : (
                         <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                          {doctor.user?.firstName?.charAt(0)}{doctor.user?.lastName?.charAt(0)}
+                          {doctor.name?.split(' ').map(n => n[0]).join('') || 'DR'}
                         </AvatarFallback>
                       )}
                     </Avatar>
                     <div>
-                      <p className="font-medium">Dr. {doctor.user?.firstName} {doctor.user?.lastName}</p>
-                      <p className="text-xs text-muted-foreground">{doctor.licenseNumber || "No license"}</p>
+                      <p className="font-medium">Dr. {doctor.name || "Unknown Doctor"}</p>
+                      <p className="text-xs text-muted-foreground">{doctor._id || "No ID"}</p>
                     </div>
                   </div>
                 </TableCell>
-                <TableCell>{doctor.specialization}</TableCell>
+                <TableCell>{doctor.specialization || "General Physician"}</TableCell>
                 <TableCell>
                   <Badge variant={doctor.isAvailable ? "default" : "secondary"} className="capitalize">
                     {doctor.isAvailable ? "Available" : "Unavailable"}
@@ -551,11 +704,11 @@ const Doctors = () => {
                   <div className="text-sm">
                     <p className="flex items-center gap-1">
                       <Mail className="h-3 w-3" />
-                      {doctor.user?.email || "No email"}
+                      {doctor.email || "No email"}
                     </p>
                     <p className="flex items-center gap-1 mt-1">
                       <Phone className="h-3 w-3" />
-                      {doctor.user?.phone || "No phone"}
+                      {doctor.mobile || "No phone"}
                     </p>
                   </div>
                 </TableCell>
@@ -739,6 +892,7 @@ const Doctors = () => {
       {(showAddDialog || showEditDialog) && (
         <DoctorFormDialog
           doctor={selectedDoctor}
+          mode={showEditDialog ? 'edit' : 'add'}
           open={showAddDialog || showEditDialog}
           onClose={handleCloseAllDialogs}
           onSave={handleSaveDoctor}
@@ -767,7 +921,7 @@ const Doctors = () => {
               <AlertDialogTitle>Are you sure you want to delete this doctor?</AlertDialogTitle>
               <AlertDialogDescription>
                 This action cannot be undone. This will permanently delete 
-                {selectedDoctor.user?.firstName ? ` ${selectedDoctor.user.firstName} ${selectedDoctor.user.lastName}` : " the doctor"} 
+                Dr. {selectedDoctor.name || "the doctor"}
                 and all associated data.
               </AlertDialogDescription>
             </AlertDialogHeader>

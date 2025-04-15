@@ -5,7 +5,10 @@ import {
   createDoctor,
   updateDoctor,
   deleteDoctor,
-  addDoctorRating
+  addDoctorRating,
+  getMyProfile,
+  getDoctorPatients,
+  getPatientDetails
 } from '../controllers/DoctorController.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 
@@ -16,9 +19,14 @@ router.get('/', getAllDoctors);
 router.get('/:id', getDoctorById);
 
 // Protected routes
-router.post('/', protect, authorize('admin'), createDoctor);
-router.put('/:id', protect, authorize('admin', 'doctor'), updateDoctor);
+router.post('/', protect, createDoctor);
+router.put('/:id', protect, updateDoctor);
 router.delete('/:id', protect, authorize('admin'), deleteDoctor);
 router.post('/:id/ratings', protect, authorize('patient'), addDoctorRating);
 
-export default router; 
+// Doctor profile routes
+router.get('/profile/me', protect, authorize('doctor'), getMyProfile);
+router.get('/patients', protect, authorize('doctor'), getDoctorPatients);
+router.get('/patients/:patientId', protect, authorize('doctor'), getPatientDetails);
+
+export default router;

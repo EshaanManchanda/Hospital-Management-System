@@ -120,7 +120,7 @@ const Dashboard = () => {
 
   // Get user data from localStorage for personalized greeting
   const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-  const adminName = userData.name || 'Admin';
+  const adminName = userData.user?.name || 'Admin';
 
   // Fetch dashboard data
   const fetchDashboardData = async (forceMock = false) => {

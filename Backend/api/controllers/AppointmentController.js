@@ -1,6 +1,7 @@
 import { Appointment } from "../models/Appointment.js";
 import { Doctor } from "../models/Doctor.js";
 import { User } from "../models/User.js";
+import { Patient } from "../models/Patient.js";  // Add this import
 
 // Get all appointments
 export const getAllAppointments = async (req, res) => {
@@ -90,6 +91,14 @@ export const createAppointment = async (req, res) => {
       symptoms
     } = req.body;
     
+    // Validate required fields
+    if (!doctorId || !date || !time) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Doctor ID, date, and time are required fields" 
+      });
+    }
+    
     // Set patient as the logged-in user if not admin
     let patientId = req.user._id;
     
@@ -104,19 +113,28 @@ export const createAppointment = async (req, res) => {
       return res.status(404).json({ success: false, message: "Doctor not found" });
     }
     
-    // Check if patient exists
-    const patient = await User.findById(patientId);
+    // Check if patient exists from Patient model
+    const patient = await Patient.findById(patientId);
     if (!patient) {
       return res.status(404).json({ success: false, message: "Patient not found" });
     }
+
+    // Format date properly to avoid timezone issues
+    const appointmentDate = new Date(date);
+    
+    // Reset hours to avoid timezone issues when checking availability
+    const startOfDay = new Date(appointmentDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(appointmentDate);
+    endOfDay.setHours(23, 59, 59, 999);
     
     // Check for time slot availability
-    const appointmentDate = new Date(date);
     const existingAppointment = await Appointment.findOne({
       doctor: doctorId,
       date: {
-        $gte: new Date(appointmentDate.setHours(0, 0, 0)),
-        $lt: new Date(appointmentDate.setHours(23, 59, 59))
+        $gte: startOfDay,
+        $lt: endOfDay
       },
       time,
       status: { $nin: ['cancelled', 'no-show'] }
@@ -126,26 +144,51 @@ export const createAppointment = async (req, res) => {
       return res.status(400).json({ success: false, message: "This time slot is already booked" });
     }
     
-    // Create new appointment
-    const appointment = await Appointment.create({
+    // Prepare symptoms array if it's a string
+    let processedSymptoms = symptoms;
+    if (typeof symptoms === 'string') {
+      // If it's a non-empty string, keep it as is
+      processedSymptoms = symptoms || '';
+    } else if (Array.isArray(symptoms)) {
+      // If it's an empty array, convert to empty string
+      // If it's a non-empty array, join with commas
+      processedSymptoms = symptoms.length > 0 ? symptoms.join(', ') : '';
+    } else {
+      // If it's undefined, null, or any other type, use empty string
+      processedSymptoms = '';
+    }
+    
+    // Create new appointment with default values for optional fields
+    const appointmentData = {
       patient: patientId,
       doctor: doctorId,
-      date,
+      date: appointmentDate,
       time,
-      type,
-      description,
-      symptoms,
-      paymentAmount: doctor.fee
-    });
+      type: type?.toLowerCase() || 'consultation', // Convert to lowercase
+      description: description || '',
+      symptoms: processedSymptoms,
+      status: 'scheduled',
+      paymentStatus: 'pending',
+      paymentAmount: doctor.fee || 0
+    };
     
-    // Add appointment to doctor's appointments
-    doctor.appointments.push(appointment._id);
-    await doctor.save();
+    // Create new appointment
+    const appointment = await Appointment.create(appointmentData);
+    
+    // Add appointment to doctor's appointments if the field exists
+    if (Array.isArray(doctor.appointments)) {
+      doctor.appointments.push(appointment._id);
+      await doctor.save();
+    }
     
     res.status(201).json({ success: true, data: appointment });
   } catch (error) {
     console.error("Error creating appointment:", error);
-    res.status(500).json({ success: false, message: "Server error", error: error.message });
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to create appointment", 
+      error: error.message 
+    });
   }
 };
 
@@ -379,4 +422,4 @@ export const getDoctorAppointments = async (req, res) => {
       error: error.message
     });
   }
-}; 
+};

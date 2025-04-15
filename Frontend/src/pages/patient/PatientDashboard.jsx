@@ -175,7 +175,7 @@ const PatientDashboard = () => {
       {/* Dashboard heading */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Patient Dashboard</h1>
-        <p className="text-gray-600">Welcome back, {patient?.firstName || patient?.name || "Patient"}</p>
+        <p className="text-gray-600">Welcome back, {patient.user?.name  || "Patient"}</p>
       </div>
       
       {/* Health Cards */}
@@ -253,13 +253,13 @@ const PatientDashboard = () => {
           </div>
           
           <div className="flex items-start space-x-3">
-            <div className="text-gray-500">Age:</div>
-            <div className="font-medium">{patient.age || "N/A"} years</div>
+            <div className="text-gray-500">Date of Birth:</div>
+            <div className="font-medium">{patient.user?.dateOfBirth ? new Date(patient.user.dateOfBirth).toLocaleDateString() : "N/A"}</div>
           </div>
           
           <div className="flex items-start space-x-3">
             <div className="text-gray-500">Gender:</div>
-            <div className="font-medium">{patient.gender || "N/A"}</div>
+            <div className="font-medium">{patient.user?.gender || "N/A"}</div>
           </div>
         </div>
       </div>

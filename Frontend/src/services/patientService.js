@@ -1,6 +1,20 @@
 // We'll use dynamic imports to avoid circular dependencies
 let api = null;
 
+// Helper function to get auth token
+const getAuthToken = () => {
+  const token = localStorage.getItem('token');
+  return token ? `Bearer ${token}` : '';
+};
+
+// Helper function to set auth headers
+const getAuthHeaders = () => {
+  return {
+    'Authorization': getAuthToken(),
+    'Content-Type': 'application/json'
+  };
+};
+
 /**
  * Service for patient-related API calls
  */
@@ -16,8 +30,17 @@ const patientService = {
       if (!api) {
         api = (await import('../utils/api')).default;
       }
+
+      // Use the existing helper function for headers
+      const config = {
+        headers: getAuthHeaders(),
+        params: {
+          page: params.page || 1,
+          limit: params.limit || 10
+        }
+      };
       
-      const response = await api.get(`/api/patients`, { params });
+      const response = await api.get('/api/patients', config);
       
       if (response.data && response.data.success) {
         return {
@@ -36,7 +59,11 @@ const patientService = {
       };
     } catch (error) {
       console.error('Error fetching patients:', error);
-      throw error;
+      return {
+        success: false,
+        data: [],
+        message: error.response?.data?.message || 'Failed to fetch patients'
+      };
     }
   },
   
@@ -47,12 +74,12 @@ const patientService = {
    */
   async getPatientById(id) {
     try {
-      // Ensure api is available
       if (!api) {
         api = (await import('../utils/api')).default;
       }
       
-      const response = await api.get(`/api/patients/${id}`);
+      const config = { headers: getAuthHeaders() };
+      const response = await api.get(`/api/patients/${id}`, config);
       
       if (response.data && response.data.success) {
         return {
@@ -80,55 +107,87 @@ const patientService = {
    */
   async createPatient(patientData) {
     try {
-      // Ensure api is available
       if (!api) {
         api = (await import('../utils/api')).default;
       }
       
-      // Structure data to match backend expectations
+      // Extract data from user object and other fields
+      const userData = patientData.user || patientData;
+      
+      // Structure data to exactly match backend controller expectations
       const formattedData = {
-        // User related fields
-        name: patientData.name,
-        email: patientData.email,
-        password: patientData.password,
-        mobile: patientData.mobile,
-        gender: patientData.gender,
-        dateOfBirth: patientData.dateOfBirth,
-        profileImage: patientData.profileImage,
-        address: patientData.address,
+        // Direct fields expected by the controller
+        name: userData.name,
+        email: userData.email,
+        password: userData.password || "password123",
+        mobile: userData.mobile,
+        gender: userData.gender,
+        dateOfBirth: userData.dateOfBirth,
+        address: userData.address,
         
         // Patient specific fields
-        bloodGroup: patientData.bloodGroup,
-        allergies: patientData.allergies,
-        conditions: patientData.conditions,
-        medications: patientData.medications,
-        surgeries: patientData.surgeries,
-        emergencyContact: patientData.emergencyContact,
-        medicalHistory: patientData.medicalHistory,
-        insurance: patientData.insurance,
-        
-        // Add a flag to indicate this is an admin creation and should not trigger auth redirects
-        skipAuthRedirect: true
+        bloodGroup: patientData.bloodGroup || patientData.bloodType,
+        height: patientData.height,
+        weight: patientData.weight,
+        allergies: patientData.allergies || [],
+        chronicDiseases: patientData.chronicConditions || patientData.conditions || [],
+        medications: patientData.medications || [],
+        medicalHistory: patientData.medicalHistory || [],
+        surgeries: patientData.surgeries || [],
+        emergencyContact: patientData.emergencyContact || {},
+        insurance: patientData.insurance || {},
+        notes: patientData.notes || "",
+        status: patientData.status || "Active"
       };
       
-      const response = await api.post(`/api/patients`, formattedData);
-      
-      if (response.data && response.data.success) {
+      // Validate required fields
+      if (!formattedData.email) {
         return {
-          success: true,
-          patient: response.data.data,
-          message: response.data.message || 'Patient created successfully'
+          success: false,
+          message: 'Email is required for patient creation'
         };
       }
       
-      return {
-        success: false,
-        patient: null,
-        message: response.data?.message || 'Failed to create patient'
-      };
+      if (!formattedData.name) {
+        return {
+          success: false,
+          message: 'Name is required for patient creation'
+        };
+      }
+      
+      console.log('Creating patient with data:', JSON.stringify(formattedData, null, 2));
+      
+      try {
+        const config = { headers: getAuthHeaders() };
+        const response = await api.post(`/api/patients/register`, formattedData, config);
+        
+        if (response.data && response.data.success) {
+          return {
+            success: true,
+            data: response.data.data,
+            message: response.data.message || 'Patient created successfully'
+          };
+        }
+        
+        return {
+          success: false,
+          message: response.data?.message || 'Failed to create patient'
+        };
+      } catch (apiError) {
+        console.error('API Error creating patient:', apiError.response?.data || apiError.message);
+        return {
+          success: false,
+          message: apiError.response?.data?.message || apiError.message || 'Failed to create patient',
+          error: apiError.response?.data?.error || apiError.message
+        };
+      }
     } catch (error) {
       console.error('Error creating patient:', error);
-      throw error;
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Failed to create patient',
+        error: error.response?.data?.error || error.message
+      };
     }
   },
   
@@ -144,30 +203,54 @@ const patientService = {
       if (!api) {
         api = (await import('../utils/api')).default;
       }
-      
-      // Structure data to match backend expectations
-      const formattedData = {
-        // User related fields
-        name: patientData.name,
-        email: patientData.email,
-        mobile: patientData.mobile,
-        gender: patientData.gender,
-        dateOfBirth: patientData.dateOfBirth,
-        profileImage: patientData.profileImage,
-        address: patientData.address,
-        
-        // Patient specific fields
-        bloodGroup: patientData.bloodGroup,
-        allergies: patientData.allergies,
-        conditions: patientData.conditions,
-        medications: patientData.medications,
-        surgeries: patientData.surgeries,
-        emergencyContact: patientData.emergencyContact,
-        medicalHistory: patientData.medicalHistory,
-        insurance: patientData.insurance
+
+      // Filter out empty or undefined values
+      const filteredData = Object.entries(patientData).reduce((acc, [key, value]) => {
+        // Handle nested user object
+        if (key === 'user' && typeof value === 'object') {
+          const filteredUser = Object.entries(value).reduce((userAcc, [userKey, userValue]) => {
+            if (userValue !== undefined && userValue !== null && userValue !== '') {
+              userAcc[userKey] = userValue;
+            }
+            return userAcc;
+          }, {});
+          if (Object.keys(filteredUser).length > 0) {
+            acc[key] = filteredUser;
+          }
+        }
+        // Handle emergencyContact object
+        else if (key === 'emergencyContact' && typeof value === 'object') {
+          const filteredContact = Object.entries(value).reduce((contactAcc, [contactKey, contactValue]) => {
+            if (contactValue !== undefined && contactValue !== null && contactValue !== '') {
+              contactAcc[contactKey] = contactValue;
+            }
+            return contactAcc;
+          }, {});
+          if (Object.keys(filteredContact).length > 0) {
+            acc[key] = filteredContact;
+          }
+        }
+        // Handle arrays (allergies, chronicConditions, medications, surgeries)
+        else if (Array.isArray(value)) {
+          if (value.length > 0) {
+            acc[key] = value;
+          }
+        }
+        // Handle regular fields
+        else if (value !== undefined && value !== null && value !== '') {
+          acc[key] = value;
+        }
+        return acc;
+      }, {});
+
+      // Add headers to the request
+      const config = {
+        headers: getAuthHeaders()
       };
-      
-      const response = await api.put(`/api/patients/${id}`, formattedData);
+
+      console.log('Sending update request with data:', filteredData);
+      const response = await api.put(`/api/patients/${id}`, filteredData, config);
+      console.log('Update response:', response);
       
       if (response.data && response.data.success) {
         return {
@@ -184,7 +267,11 @@ const patientService = {
       };
     } catch (error) {
       console.error(`Error updating patient with ID ${id}:`, error);
-      throw error;
+      return {
+        success: false,
+        patient: null,
+        message: error.response?.data?.message || 'An error occurred while updating the patient'
+      };
     }
   },
   
@@ -195,12 +282,12 @@ const patientService = {
    */
   async deletePatient(id) {
     try {
-      // Ensure api is available
       if (!api) {
         api = (await import('../utils/api')).default;
       }
       
-      const response = await api.delete(`/api/patients/${id}`);
+      const config = { headers: getAuthHeaders() };
+      const response = await api.delete(`/api/patients/${id}`, config);
       
       if (response.data && response.data.success) {
         return {
@@ -226,12 +313,12 @@ const patientService = {
    */
   async getPatientMedicalRecords(id) {
     try {
-      // Ensure api is available
       if (!api) {
         api = (await import('../utils/api')).default;
       }
       
-      const response = await api.get(`/api/patients/${id}/medical-records`);
+      const config = { headers: getAuthHeaders() };
+      const response = await api.get(`/api/patients/${id}/medical-records`, config);
       
       if (response.data && response.data.success) {
         return {
@@ -260,12 +347,12 @@ const patientService = {
    */
   async updatePatientMedicalRecords(id, recordsData) {
     try {
-      // Ensure api is available
       if (!api) {
         api = (await import('../utils/api')).default;
       }
       
-      const response = await api.put(`/api/patients/${id}/medical-records`, recordsData);
+      const config = { headers: getAuthHeaders() };
+      const response = await api.put(`/api/patients/${id}/medical-records`, recordsData, config);
       
       if (response.data && response.data.success) {
         return {
@@ -284,9 +371,31 @@ const patientService = {
       console.error(`Error updating medical records for patient ${id}:`, error);
       throw error;
     }
-  }
+  },
+
+  /**
+   * Get patient and user data from localStorage
+   * @returns {Object} - Combined user and patient data
+   */
+  getLocalPatientData() {
+    try {
+      if (typeof window === 'undefined') return {};
+      
+      const user = JSON.parse(localStorage.getItem('user') || 'null');
+      const patient = JSON.parse(localStorage.getItem('patient') || 'null');
+      
+      return {
+        user: user || null,
+        patient: patient || null,
+        token: localStorage.getItem('token') || null
+      };
+    } catch (error) {
+      console.error('Error parsing localStorage data:', error);
+      return { user: null, patient: null, token: null };
+    }
+  },
 };
 
 // Export as both default and named export
 export { patientService };
-export default patientService; 
+export default patientService;

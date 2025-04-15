@@ -7,9 +7,16 @@ const receptionistSchema = new mongoose.Schema({
     required: true
   },
   workingHours: {
-    start: String,
-    end: String,
-    required: true
+    start: {
+      type: String,
+      default: "09:00",
+      required: true
+    },
+    end: {
+      type: String,
+      default: "17:00",
+      required: true
+    }
   },
   workingDays: [{
     type: String,
@@ -17,7 +24,8 @@ const receptionistSchema = new mongoose.Schema({
   }],
   assignedDepartment: {
     type: String,
-    required: true
+    required: true,
+    default: "Front Desk"
   },
   jobResponsibilities: [{
     type: String
@@ -48,8 +56,24 @@ const receptionistSchema = new mongoose.Schema({
     type: Number,
     min: 1,
     max: 5,
-    default: 0
+    default: null,
+    validate: {
+      validator: function(v) {
+        return v === null || (v >= 1 && v <= 5);
+      },
+      message: props => `${props.value} is not a valid rating! Rating must be between 1 and 5, or null`
+    }
   }
 }, { timestamps: true });
 
-export const Receptionist = mongoose.model('Receptionist', receptionistSchema); 
+// Add a method to the schema (example)
+receptionistSchema.methods.isWorking = function(dayOfWeek) {
+  return this.workingDays.includes(dayOfWeek);
+};
+
+// Create the model
+const Receptionist = mongoose.model('Receptionist', receptionistSchema);
+
+// Export as both default and named export
+export default Receptionist;
+export { Receptionist }; 

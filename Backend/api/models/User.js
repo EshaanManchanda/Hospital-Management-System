@@ -48,7 +48,7 @@ const userSchema = new mongoose.Schema({
     required: function() {
       return !this.googleId; // Mobile is required only if not using Google OAuth
     },
-    match: [/^[0-9]{10}$/, 'Please enter a valid 10-digit mobile number']
+    match: [/^\+?[0-9]{8,15}$/, 'Please enter a valid mobile number (8-15 digits, optional + prefix)']
   },
   address: {
     street: String,

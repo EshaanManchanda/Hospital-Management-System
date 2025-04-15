@@ -1,4 +1,19 @@
-import api from '../utils/api';
+// We'll use dynamic imports to avoid circular dependencies
+let api = null;
+
+// Helper function to get auth token
+const getAuthToken = () => {
+  const token = localStorage.getItem('token');
+  return token ? `Bearer ${token}` : '';
+};
+
+// Helper function to set auth headers
+const getAuthHeaders = () => {
+  return {
+    'Authorization': getAuthToken(),
+    'Content-Type': 'application/json'
+  };
+};
 
 /**
  * Doctor service for managing doctor data
@@ -12,110 +27,180 @@ const doctorService = {
    */
   getAllDoctors: async (page = 1, limit = 10) => {
     try {
-      // Use the proper endpoint based on the backend route
-      const response = await api.get(`/api/doctors`);
+      if (!api) {
+        api = (await import('../utils/api')).default;
+      }
+      
+      const config = {
+        headers: getAuthHeaders(),
+        params: { page, limit }
+      };
+      
+      const response = await api.get('/api/doctors', config);
       
       console.log("Doctor API response:", response.data);
       
-      // Safely extract data with fallbacks
-      const responseData = response?.data || {};
-      
-      // Handle all possible response structures
-      let doctors = [];
-      let count = 0;
-      let success = true;
-      
-      // Case 1: Standard API response with success flag
-      if (typeof responseData.success === 'boolean' && responseData.success === true) {
-        doctors = responseData.data || [];
-        count = responseData.count || doctors.length;
+      // Return the API response directly with standardized structure
+      if (response.data && response.data.success) {
+        // Log detailed doctor data to help diagnose issues
+        const doctorData = response.data.data || [];
+        doctorData.forEach((doctor, index) => {
+          console.log(`API doctor ${index + 1} details:`, {
+            doctorId: doctor._id,
+            name: doctor.name,
+            email: doctor.email,
+            specialization: doctor.specialization
+          });
+        });
+        
+        return {
+          success: true,
+          data: doctorData,
+          count: response.data.count || 0,
+          message: response.data.message || 'Doctors fetched successfully'
+        };
+      } else {
+        return {
+          success: false,
+          data: [],
+          count: 0,
+          message: response.data?.message || 'Failed to fetch doctors'
+        };
       }
-      // Case 2: Direct array of doctors
-      else if (Array.isArray(responseData)) {
-        doctors = responseData;
-        count = responseData.length;
-      }
-      // Case 3: Data property containing array
-      else if (responseData.data && Array.isArray(responseData.data)) {
-        doctors = responseData.data;
-        count = responseData.count || doctors.length;
-      }
-      // Case 4: Unknown structure but has doctors property
-      else if (responseData.doctors && Array.isArray(responseData.doctors)) {
-        doctors = responseData.doctors;
-        count = responseData.totalDoctors || doctors.length;
-      }
-      // If none of the above, consider it an error
-      else {
-        throw new Error('Invalid API response format');
-      }
-      
-      // Return standardized response
-      return {
-        success: true,
-        doctors: doctors,
-        totalDoctors: count
-      };
     } catch (error) {
       console.error('Get doctors error:', error);
-      // Return error in a way that won't cause "is not a function" errors
       return {
         success: false,
-        doctors: [],
-        totalDoctors: 0,
+        data: [],
+        count: 0,
         message: error.message || 'Failed to fetch doctors'
       };
     }
   },
   
   /**
-   * Get a doctor by ID
+   * Get a doctor by ID (will create one if user exists but doctor doesn't)
    * @param {string} id - Doctor ID
+   * @param {boolean} preventAutoCreation - If true, prevents automatic doctor creation
    * @returns {Promise<Object>} Doctor data
    */
-  getDoctorById: async (id) => {
+  getDoctorById: async (id, preventAutoCreation = true) => {
     try {
-      const response = await api.get(`/api/doctors/${id}`);
+      if (!api) {
+        api = (await import('../utils/api')).default;
+      }
       
-      if (response.data && response.data.success) {
-        return {
-          doctor: response.data.data,
-          success: true
-        };
+      const config = { headers: getAuthHeaders() };
+      
+      if (preventAutoCreation) {
+        try {
+          const response = await api.get(`/api/doctors/${id}?preventAutoCreation=true`, config);
+          
+          if (response.data && response.data.success) {
+            console.log('Doctor found:', response.data.data);
+            return {
+              success: true,
+              data: response.data.data,
+              message: response.data.message || 'Doctor retrieved successfully'
+            };
+          } else {
+            return {
+              success: false,
+              data: null,
+              message: response.data?.message || 'Failed to fetch doctor'
+            };
+          }
+        } catch (error) {
+          console.error('Get doctor error:', error);
+          
+          // Handle 404 case specially
+          if (error.response && error.response.status === 404) {
+            return {
+              success: false,
+              message: 'Doctor not found',
+              error: 'The requested doctor could not be found'
+            };
+          }
+          
+          return {
+            success: false,
+            message: error.message || 'Failed to fetch doctor',
+            error: error.response?.data?.error || error.message
+          };
+        }
       } else {
-        throw new Error(response.data?.message || 'Failed to fetch doctor');
+        // Original behavior - allows auto-creation
+        const response = await api.get(`/api/doctors/${id}`, config);
+        
+        if (response.data && response.data.success) {
+          console.log('Doctor found or created:', response.data.data);
+          return {
+            success: true,
+            data: response.data.data,
+            message: response.data.message || 'Doctor retrieved successfully'
+          };
+        } else {
+          return {
+            success: false,
+            data: null,
+            message: response.data?.message || 'Failed to fetch doctor'
+          };
+        }
       }
     } catch (error) {
       console.error('Get doctor error:', error);
-      throw error;
+      
+      // Handle 404 case specially
+      if (error.response && error.response.status === 404) {
+        return {
+          success: false,
+          message: 'Doctor not found',
+          error: 'The requested doctor could not be found'
+        };
+      }
+      
+      return {
+        success: false,
+        message: error.message || 'Failed to fetch doctor',
+        error: error.response?.data?.error || error.message
+      };
     }
   },
 
   /**
    * Create a new doctor
-   * @param {Object} doctorData - Doctor data including user information
+   * @param {Object} doctorData - Doctor data
    * @returns {Promise<Object>} Created doctor data
    */
   createDoctor: async (doctorData) => {
     try {
-      // The data is already formatted in the form component
-      // to match the API expectations, so we don't need additional formatting here
-      console.log('Creating doctor with data:', doctorData);
+      if (!api) {
+        api = (await import('../utils/api')).default;
+      }
       
-      const response = await api.post('/api/doctors', doctorData);
+      const config = { headers: getAuthHeaders() };
+      const response = await api.post('/api/doctors', doctorData, config);
       
       if (response.data && response.data.success) {
         return {
-          doctor: response.data.data,
-          message: response.data.message || 'Doctor created successfully',
-          success: true
+          success: true,
+          data: response.data.data,
+          message: response.data.message || 'Doctor created successfully'
         };
       } else {
-        throw new Error(response.data?.message || 'Failed to create doctor');
+        return {
+          success: false,
+          message: response.data?.message || 'Failed to create doctor',
+          error: response.data?.error
+        };
       }
     } catch (error) {
       console.error('Create doctor error:', error);
-      throw error;
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message,
+        error: error.response?.data?.error || 'Failed to create doctor'
+      };
     }
   },
 
@@ -125,42 +210,76 @@ const doctorService = {
    * @param {Object} doctorData - Doctor data to update
    * @returns {Promise<Object>} Updated doctor data
    */
+  /**
+   * Update doctor profile
+   * @param {string} id - Doctor ID
+   * @param {Object} doctorData - Updated doctor data
+   * @returns {Promise<Object>} Updated doctor data
+   */
   updateDoctor: async (id, doctorData) => {
     try {
-      // Log the doctor ID and data being sent
-      console.log('Updating doctor with ID:', id);
-      console.log('Full update payload:', doctorData);
+      if (!api) {
+        api = (await import('../utils/api')).default;
+      }
       
-      // Create a sanitized payload by removing undefined or null values
-      const sanitizedData = Object.entries(doctorData)
-        .filter(([_, value]) => value !== undefined && value !== null)
-        .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
-      
-      console.log('Sanitized update payload:', sanitizedData);
-      
-      // Make the API call with proper error handling
-      const response = await api.put(`/api/doctors/${id}`, sanitizedData);
+      const config = { headers: getAuthHeaders() };
+      const response = await api.put(`/api/doctors/${id}`, doctorData, config);
       
       if (response.data && response.data.success) {
+        // Update the cached doctor profile in localStorage
+        const updatedDoctor = response.data.doctor || response.data.data;
+        if (updatedDoctor) {
+          localStorage.setItem('doctorProfile', JSON.stringify(updatedDoctor));
+        }
+        
         return {
-          doctor: response.data.data,
-          message: response.data.message || 'Doctor updated successfully',
-          success: true
+          success: true,
+          doctor: updatedDoctor,
+          message: response.data.message || 'Doctor profile updated successfully'
         };
       } else {
-        throw new Error(response.data?.message || 'Failed to update doctor');
+        return {
+          success: false,
+          message: response.data?.message || 'Failed to update doctor profile'
+        };
       }
     } catch (error) {
-      console.error('Update doctor error:', error);
-      // Log detailed error information
+      console.error('Error updating doctor:', error);
+      
+      // Handle different error types
       if (error.response) {
-        console.error('Error response:', {
-          status: error.response.status,
-          statusText: error.response.statusText,
-          data: error.response.data
-        });
+        // Server responded with an error
+        console.error('Server error response:', error.response.data);
+        
+        // Special handling for 404 Not Found errors
+        if (error.response.status === 404) {
+          return {
+            success: false,
+            message: 'Doctor not found',
+            error: 'The requested doctor could not be found in the database. It may have been deleted.'
+          };
+        }
+        
+        return {
+          success: false,
+          message: error.response.data?.message || 'Server error',
+          error: error.response.data?.error || error.message
+        };
+      } else if (error.request) {
+        // Request was made but no response received
+        return {
+          success: false,
+          message: 'No response from server',
+          error: 'Network error - check your connection'
+        };
+      } else {
+        // Something else caused the error
+        return {
+          success: false,
+          message: 'Failed to send request',
+          error: error.message
+        };
       }
-      throw error;
     }
   },
   
@@ -171,19 +290,55 @@ const doctorService = {
    */
   deleteDoctor: async (id) => {
     try {
-      const response = await api.delete(`/api/doctors/${id}`);
+      if (!api) {
+        api = (await import('../utils/api')).default;
+      }
+      
+      const config = { headers: getAuthHeaders() };
+      const response = await api.delete(`/api/doctors/${id}`, config);
       
       if (response.data && response.data.success) {
         return {
-          message: response.data.message || 'Doctor deleted successfully',
-          success: true
+          success: true,
+          message: response.data.message || 'Doctor deleted successfully'
         };
       } else {
-        throw new Error(response.data?.message || 'Failed to delete doctor');
+        return {
+          success: false,
+          message: response.data?.message || 'Failed to delete doctor'
+        };
       }
     } catch (error) {
       console.error('Delete doctor error:', error);
-      throw error;
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message,
+        error: error.response?.data?.error || 'Failed to delete doctor'
+      };
+    }
+  },
+  
+  /**
+   * Check if a doctor exists in the database
+   * @param {string} id - Doctor ID
+   * @returns {Promise<boolean>} True if doctor exists, false otherwise
+   */
+  checkDoctorExists: async (id) => {
+    try {
+      if (!api) {
+        api = (await import('../utils/api')).default;
+      }
+      
+      const config = { headers: getAuthHeaders() };
+      const response = await api.get(`/api/doctors/${id}`, config);
+      
+      // If we get a successful response, the doctor exists
+      console.log('Doctor check result:', response.data);
+      return response.data && response.data.success;
+    } catch (error) {
+      console.log('Doctor not found or error occurred:', error.response?.status);
+      return false;
+
     }
   },
   
@@ -194,19 +349,33 @@ const doctorService = {
    */
   getDoctorsBySpecialization: async (specialization) => {
     try {
-      const response = await api.get(`/api/doctors/specialization/${specialization}`);
+      if (!api) {
+        api = (await import('../utils/api')).default;
+      }
+      
+      const config = { headers: getAuthHeaders() };
+      const response = await api.get(`/api/doctors/specialization/${specialization}`, config);
       
       if (response.data && response.data.success) {
         return {
-          doctors: response.data.data || [],
-          success: true
+          success: true,
+          data: response.data.data || [],
+          message: response.data.message || 'Doctors retrieved successfully'
         };
-      } else {
-        throw new Error(response.data?.message || 'Failed to fetch doctors by specialization');
       }
+      
+      return {
+        success: false,
+        data: [],
+        message: response.data?.message || 'Failed to fetch doctors by specialization'
+      };
     } catch (error) {
       console.error('Get doctors by specialization error:', error);
-      throw error;
+      return {
+        success: false,
+        data: [],
+        message: error.message || 'Failed to fetch doctors by specialization'
+      };
     }
   },
   
@@ -216,19 +385,33 @@ const doctorService = {
    */
   getSpecializations: async () => {
     try {
-      const response = await api.get('/api/doctors/specializations');
+      if (!api) {
+        api = (await import('../utils/api')).default;
+      }
+      
+      const config = { headers: getAuthHeaders() };
+      const response = await api.get('/api/doctors/specializations', config);
       
       if (response.data && response.data.success) {
         return {
-          specializations: response.data.data || [],
-          success: true
+          success: true,
+          data: response.data.data || [],
+          message: response.data.message || 'Specializations retrieved successfully'
         };
-      } else {
-        throw new Error(response.data?.message || 'Failed to fetch specializations');
       }
+      
+      return {
+        success: false,
+        data: [],
+        message: response.data?.message || 'Failed to fetch specializations'
+      };
     } catch (error) {
       console.error('Get specializations error:', error);
-      throw error;
+      return {
+        success: false,
+        data: [],
+        message: error.message || 'Failed to fetch specializations'
+      };
     }
   },
 
@@ -240,13 +423,162 @@ const doctorService = {
    */
   addDoctorRating: async (id, ratingData) => {
     try {
-      const response = await api.post(`/api/doctors/${id}/ratings`, ratingData);
+      const config = { headers: getAuthHeaders() };
+      const response = await api.post(`/api/doctors/${id}/ratings`, ratingData, config);
       return response.data;
     } catch (error) {
       console.error('Add doctor rating error:', error);
       throw error;
     }
-  }
-};
+  },
 
-export default doctorService; 
+  /**
+   * Get the current doctor's profile
+   * @returns {Promise<Object>} Doctor profile data
+   */
+  getMyProfile: async () => {
+    try {
+      // First try to get from localStorage
+      const cachedDoctorProfile = localStorage.getItem('doctorProfile');
+      
+      if (cachedDoctorProfile) {
+        try {
+          const parsedProfile = JSON.parse(cachedDoctorProfile);
+          console.log('Using cached doctor profile from localStorage');
+          
+          // Check if the cached profile has all required fields
+          if (parsedProfile && parsedProfile._id) {
+            return {
+              success: true,
+              doctor: parsedProfile,
+              message: 'Doctor profile fetched from cache',
+              source: 'cache'
+            };
+          }
+        } catch (parseError) {
+          console.warn('Error parsing cached doctor profile:', parseError);
+          // Continue to API fetch if parsing fails
+        }
+      }
+      
+      // If not in localStorage or invalid cache, fetch from API
+      console.log('No valid cached profile found, fetching from API');
+      
+      // Ensure api is available
+      if (!api) {
+        api = (await import('../utils/api')).default;
+      }
+      
+      const token = localStorage.getItem('token');
+      if (!token) {
+        return {
+          success: false,
+          message: 'Authentication required'
+        };
+      }
+      
+      // Set authorization header
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      
+      const response = await api.get('/api/doctors/me', config);
+      
+      if (response.data && response.data.success) {
+        // Cache the doctor profile in localStorage for faster access
+        localStorage.setItem('doctorProfile', JSON.stringify(response.data.doctor));
+        
+        return {
+          success: true,
+          doctor: response.data.doctor,
+          message: 'Doctor profile fetched successfully from API',
+          source: 'api'
+        };
+      } else {
+        return {
+          success: false,
+          message: response.data?.message || 'Failed to fetch doctor profile'
+        };
+      }
+    } catch (error) {
+      console.error('Error fetching doctor profile:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Failed to fetch doctor profile'
+      };
+    }
+  },
+
+  /**
+   * Get all patients for the current doctor
+   * @returns {Promise<Object>} List of patients
+   */
+  getDoctorPatients: async () => {
+    try {
+      if (!api) {
+        api = (await import('../utils/api')).default;
+      }
+      
+      const config = { headers: getAuthHeaders() };
+      const response = await api.get('/api/doctors/patients', config);
+      
+      if (response.data && response.data.success) {
+        return {
+          success: true,
+          data: response.data.patients || response.data.data || [],
+          message: response.data.message || 'Patients retrieved successfully'
+        };
+      }
+      
+      return {
+        success: false,
+        data: [],
+        message: response.data?.message || 'Failed to fetch patients'
+      };
+    } catch (error) {
+      console.error('Get doctor patients error:', error);
+      return {
+        success: false,
+        data: [],
+        message: error.response?.data?.message || error.message || 'Failed to fetch patients'
+      };
+    }
+  },
+
+  /**
+   * Get patient details by ID
+   * @param {string} patientId - Patient ID
+   * @returns {Promise<Object>} Patient details
+   */
+  getPatientDetails: async (patientId) => {
+    try {
+      if (!api) {
+        api = (await import('../utils/api')).default;
+      }
+      
+      const config = { headers: getAuthHeaders() };
+      const response = await api.get(`/api/doctors/patients/${patientId}`, config);
+      
+      if (response.data && response.data.success) {
+        return {
+          success: true,
+          data: response.data.patient || response.data.data,
+          message: response.data.message || 'Patient details retrieved successfully'
+        };
+      }
+      
+      return {
+        success: false,
+        message: response.data?.message || 'Failed to fetch patient details'
+      };
+    } catch (error) {
+      console.error('Get patient details error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Failed to fetch patient details'
+      };
+    }
+  },
+}
+// Export as both default and named export
+// Export the service
+export { doctorService };
+export default doctorService;

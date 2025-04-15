@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   User, 
   Mail, 
@@ -9,43 +9,122 @@ import {
   Clock,
   Edit,
   Save,
-  X
+  X,
+  Loader2
 } from 'lucide-react';
+import { authService } from '../../services/authService';
+import { doctorService } from '../../services/doctorService';
+import { toast } from 'react-hot-toast';
 
 const DoctorProfile = () => {
-  // Mock doctor data
-  const [doctorData, setDoctorData] = useState({
-    id: 'D-10023',
-    name: 'Dr. William Chen',
-    email: 'william.chen@hospital.com',
-    phone: '(555) 123-4567',
-    specialty: 'Cardiology',
-    experience: '12 years',
-    education: [
-      'MD, Harvard Medical School, 2010',
-      'Residency, Massachusetts General Hospital, 2014',
-      'Fellowship in Cardiology, Mayo Clinic, 2016'
-    ],
-    certifications: [
-      'American Board of Internal Medicine',
-      'American College of Cardiology',
-      'Advanced Cardiac Life Support (ACLS)'
-    ],
-    schedule: {
-      Monday: '9:00 AM - 5:00 PM',
-      Tuesday: '9:00 AM - 5:00 PM',
-      Wednesday: '9:00 AM - 1:00 PM',
-      Thursday: '9:00 AM - 5:00 PM',
-      Friday: '9:00 AM - 5:00 PM',
-      Saturday: 'Off',
-      Sunday: 'Off'
-    },
-    bio: 'Dr. William Chen is a board-certified cardiologist with over 12 years of experience in diagnosing and treating heart conditions. He specializes in interventional cardiology, heart failure management, and preventive cardiology.',
-    avatar: 'https://randomuser.me/api/portraits/men/32.jpg'
-  });
-  
+  const [doctorData, setDoctorData] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [editedData, setEditedData] = useState({ ...doctorData });
+  const [editedData, setEditedData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
+  useEffect(() => {
+    const fetchDoctorProfile = async () => {
+      try {
+        setLoading(true);
+        const response = await authService.getDoctorProfile();
+        
+        if (response.success) {
+          // Transform API data to match component structure
+          const doctor = response.doctor;
+          console.log('Doctor data from API:', doctor); // Debug log
+          
+          // Create a more comprehensive mapping from API response to component data
+          const formattedData = {
+            id: doctor.doctorId || doctor._id || doctor.id || '',
+            name: doctor.user?.name || doctor.name || 'Doctor',
+            email: doctor.user?.email || doctor.email || '',
+            gender: doctor.user?.gender || doctor.gender || '',
+            phone: doctor.user?.mobile || doctor.mobile || doctor.phone || '',
+            specialty: doctor.specialization || doctor.specialty || '',
+            experience: typeof doctor.experience === 'number' ? `${doctor.experience} years` : doctor.experience || '0 years',
+            education: Array.isArray(doctor.qualifications) ? doctor.qualifications : [],
+            certifications: Array.isArray(doctor.certifications) ? doctor.certifications : [],
+            // Map working days and hours to schedule format
+            schedule: Array.isArray(doctor.workingDays) ? 
+              doctor.workingDays.reduce((acc, day) => {
+                acc[day] = doctor.workingHours ? 
+                  `${doctor.workingHours.start || '09:00'} - ${doctor.workingHours.end || '17:00'}` : 
+                  '09:00 - 17:00';
+                return acc;
+              }, {
+                Monday: 'Not set',
+                Tuesday: 'Not set',
+                Wednesday: 'Not set',
+                Thursday: 'Not set',
+                Friday: 'Not set',
+                Saturday: 'Not set',
+                Sunday: 'Not set'
+              }) : 
+              {
+                Monday: 'Not set',
+                Tuesday: 'Not set',
+                Wednesday: 'Not set',
+                Thursday: 'Not set',
+                Friday: 'Not set',
+                Saturday: 'Not set',
+                Sunday: 'Not set'
+              },
+            bio: doctor.about || doctor.bio || 'No bio available',
+            avatar: doctor.user?.profileImage || doctor.profileImage || doctor.avatar || 
+                   `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.user?.name || doctor.name || 'Doctor')}&background=random`,
+            fee: doctor.fee || 0,
+            isAvailable: doctor.isAvailable !== undefined ? doctor.isAvailable : true,
+            averageRating: doctor.averageRating || 0,
+            patients: Array.isArray(doctor.patients) ? doctor.patients.length : 0
+          };
+          
+          console.log('Formatted doctor data:', formattedData); // Debug log
+          setDoctorData(formattedData);
+          setEditedData(formattedData);
+        } else {
+          setError(response.message || 'Failed to load doctor profile');
+          // Set default data if API fails
+          const userData = authService.getUserData();
+          const defaultData = {
+            id: userData?.doctorId || 'D-00000',
+            name: userData?.name || 'Doctor',
+            email: userData?.email || '',
+            phone: userData?.mobile || '',
+            specialty: userData?.specialization || 'Not specified',
+            experience: userData?.experience || '0 years',
+            education: [],
+            certifications: [],
+            schedule: {
+              Monday: 'Not set',
+              Tuesday: 'Not set',
+              Wednesday: 'Not set',
+              Thursday: 'Not set',
+              Friday: 'Not set',
+              Saturday: 'Not set',
+              Sunday: 'Not set'
+            },
+            bio: userData?.about || 'No bio available',
+            avatar: userData?.profileImage || 
+                   `https://ui-avatars.com/api/?name=${encodeURIComponent(userData?.name || 'Doctor')}&background=random`,
+            fee: 0,
+            isAvailable: true,
+            averageRating: 0,
+            patients: 0
+          };
+          setDoctorData(defaultData);
+          setEditedData(defaultData);
+        }
+      } catch (err) {
+        console.error('Error fetching doctor profile:', err);
+        setError('Failed to load doctor profile');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDoctorProfile();
+  }, []);
   
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -65,15 +144,78 @@ const DoctorProfile = () => {
     });
   };
   
-  const handleSave = () => {
-    setDoctorData(editedData);
-    setIsEditing(false);
+  const handleSave = async () => {
+    try {
+      setLoading(true);
+      
+      // Transform the edited data back to the format expected by the API
+      const updateData = {
+        specialization: editedData.specialty,
+        experience: parseInt(editedData.experience) || 0,
+        fee: parseInt(editedData.fee) || 0,
+        about: editedData.bio,
+        isAvailable: editedData.isAvailable,
+        // Add user data that might need updating
+        user: {
+          name: editedData.name,
+          email: editedData.email,
+          mobile: editedData.phone,
+          gender: editedData.gender
+        }
+      };
+      
+      // Call the API to update the doctor profile
+      const response = await doctorService.updateDoctor(doctorData.id, updateData);
+      
+      if (response.success) {
+        // Update the local state with the edited data
+        setDoctorData(editedData);
+        setIsEditing(false);
+        
+        // Cache the updated profile in localStorage
+        localStorage.setItem('doctorProfile', JSON.stringify(editedData));
+        
+        toast.success('Profile updated successfully');
+      } else {
+        toast.error(response.message || 'Failed to update profile');
+      }
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      toast.error(error.message || 'Failed to update profile');
+    } finally {
+      setLoading(false);
+    }
   };
   
   const handleCancel = () => {
     setEditedData({ ...doctorData });
     setIsEditing(false);
   };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
+        <span className="ml-2 text-gray-600">Loading profile...</span>
+      </div>
+    );
+  }
+
+  if (error && !doctorData) {
+    return (
+      <div className="p-6 bg-red-50 rounded-lg text-center">
+        <X className="h-12 w-12 text-red-500 mx-auto mb-2" />
+        <h2 className="text-xl font-semibold text-red-700 mb-2">Error Loading Profile</h2>
+        <p className="text-red-600 mb-4">{error}</p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">
@@ -115,7 +257,11 @@ const DoctorProfile = () => {
               <img 
                 src={doctorData.avatar} 
                 alt={doctorData.name} 
-                className="h-32 w-32 rounded-full mx-auto mb-4"
+                className="h-32 w-32 rounded-full mx-auto mb-4 object-cover"
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = "https://ui-avatars.com/api/?name=" + encodeURIComponent(doctorData.name);
+                }}
               />
               <h2 className="text-xl font-semibold">{doctorData.name}</h2>
               <p className="text-gray-600">{doctorData.specialty}</p>
@@ -149,7 +295,7 @@ const DoctorProfile = () => {
                     className="flex-1 p-2 border rounded"
                   />
                 ) : (
-                  <span>{doctorData.phone}</span>
+                  <span>{doctorData.phone || 'Not provided'}</span>
                 )}
               </div>
               
@@ -167,6 +313,23 @@ const DoctorProfile = () => {
                   <span>Experience: {doctorData.experience}</span>
                 )}
               </div>
+              
+              <div className="flex items-center">
+                <User className="h-5 w-5 text-gray-400 mr-3" />
+                <span>Gender: {doctorData.gender || 'Not specified'}</span>
+              </div>
+              
+              <div className="flex items-center">
+                <Clock className="h-5 w-5 text-gray-400 mr-3" />
+                <span>Consultation Fee: ₹{doctorData.fee}</span>
+              </div>
+              
+              {doctorData.patients > 0 && (
+                <div className="flex items-center">
+                  <User className="h-5 w-5 text-gray-400 mr-3" />
+                  <span>Patients: {doctorData.patients}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -199,9 +362,13 @@ const DoctorProfile = () => {
               </div>
               
               <ul className="space-y-2">
-                {doctorData.education.map((edu, index) => (
-                  <li key={index} className="text-gray-700">{edu}</li>
-                ))}
+                {doctorData.education && doctorData.education.length > 0 ? (
+                  doctorData.education.map((edu, index) => (
+                    <li key={index} className="text-gray-700">{edu}</li>
+                  ))
+                ) : (
+                  <li className="text-gray-500 italic">No education information available</li>
+                )}
               </ul>
             </div>
             
@@ -213,9 +380,13 @@ const DoctorProfile = () => {
               </div>
               
               <ul className="space-y-2">
-                {doctorData.certifications.map((cert, index) => (
-                  <li key={index} className="text-gray-700">{cert}</li>
-                ))}
+                {doctorData.certifications && doctorData.certifications.length > 0 ? (
+                  doctorData.certifications.map((cert, index) => (
+                    <li key={index} className="text-gray-700">{cert}</li>
+                  ))
+                ) : (
+                  <li className="text-gray-500 italic">No certification information available</li>
+                )}
               </ul>
             </div>
           </div>
@@ -228,7 +399,7 @@ const DoctorProfile = () => {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {Object.entries(doctorData.schedule).map(([day, hours], index) => (
+              {doctorData.schedule && Object.entries(doctorData.schedule).map(([day, hours], index) => (
                 <div key={index} className="flex justify-between items-center border-b pb-2">
                   <span className="font-medium">{day}</span>
                   {isEditing ? (
@@ -251,4 +422,4 @@ const DoctorProfile = () => {
   );
 };
 
-export default DoctorProfile; 
+export default DoctorProfile;
