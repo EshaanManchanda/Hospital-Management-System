@@ -1,5 +1,5 @@
 // Import all services except the ones creating circular dependencies
-import authService from './authservice';
+import authService from './authService';
 import doctorService from './doctorService';
 import appointmentService from './appointmentService';
 import adminService from './adminService';
