@@ -786,3 +786,47 @@ export const getDoctorPatients = async (req, res) => {
     });
   }
 };
+
+// Add this function to PatientController.js
+
+// Get patient by user ID
+export const getPatientByUserId = async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required"
+      });
+    }
+    
+    console.log(`Fetching patient with user ID: ${userId}`);
+    
+    const patient = await Patient.findOne({ user: userId })
+      .populate({
+        path: 'user',
+        select: 'name email mobile gender dateOfBirth address'
+      });
+    
+    if (!patient) {
+      return res.status(404).json({
+        success: false,
+        message: "Patient not found for this user ID"
+      });
+    }
+    
+    return res.status(200).json({
+      success: true,
+      data: patient,
+      message: "Patient retrieved successfully"
+    });
+  } catch (error) {
+    console.error("Error fetching patient by user ID:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message
+    });
+  }
+};

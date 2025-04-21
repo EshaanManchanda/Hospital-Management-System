@@ -11,7 +11,8 @@ import {
     addMedication,
     addMedicalReport,
     getPatientStats,
-    getDoctorPatients
+    getDoctorPatients,
+    getPatientByUserId
 } from '../controllers/PatientController.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 
@@ -49,5 +50,9 @@ router.post('/:id/medications', authorize('admin', 'doctor'), addMedication);
 // Medical report routes
 router.post('/:id/reports', addMedicalReport);
 
+// Add this route to PatientRoute.js
+
+// Get patient by user ID
+router.get('/user/:userId', protect, getPatientByUserId);
 
 export default router;

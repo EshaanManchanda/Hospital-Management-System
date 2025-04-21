@@ -14,99 +14,55 @@ import {
   Coffee,
   Utensils
 } from "lucide-react";
-import { authService } from "../../services";
+import medicineService from "../../services/medicineService";
+import MedicineDetailsDialog from "../../components/dialogs/MedicineDetailsDialog";
+import { useNavigate } from "react-router-dom";
 
 const PatientMedications = () => {
   const [medications, setMedications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("current");
+  const [selectedMedicine, setSelectedMedicine] = useState(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchMedications = async () => {
       try {
         setLoading(true);
-        
-        // Check authentication
-        const token = localStorage.getItem('token');
-        if (!token) {
-          throw new Error("Authentication required");
+        // Remove direct patientId check; let the service handle it
+        const response = await medicineService.getMedicationsByPatient();
+        if (response.success) {
+          setMedications(response.data);
+        } else {
+          setError(response.message || "Failed to load medications");
         }
-        
-        // In a real application, you would fetch data from your API
-        // const response = await medicationService.getPatientMedications(patientId);
-        // setMedications(response.data);
-        
-        // For now, we'll use dummy data
-        const dummyMedications = [
-          {
-            id: "1",
-            name: "Amoxicillin",
-            dosage: "500mg",
-            frequency: "3 times daily",
-            startDate: "2023-11-15",
-            endDate: "2023-11-30",
-            status: "active",
-            instructions: "Take with food",
-            prescribedBy: "Dr. Sarah Johnson",
-            refillsRemaining: 2,
-            nextDose: "11:30 AM",
-            icon: <Pill className="h-5 w-5" />
-          },
-          {
-            id: "2",
-            name: "Lisinopril",
-            dosage: "10mg",
-            frequency: "Once daily",
-            startDate: "2023-10-05",
-            endDate: "2024-04-05",
-            status: "active",
-            instructions: "Take in the morning",
-            prescribedBy: "Dr. Michael Wong",
-            refillsRemaining: 5,
-            nextDose: "8:00 AM",
-            icon: <Pill className="h-5 w-5" />
-          },
-          {
-            id: "3",
-            name: "Ibuprofen",
-            dosage: "400mg",
-            frequency: "As needed for pain",
-            startDate: "2023-11-10",
-            endDate: "2023-11-20",
-            status: "completed",
-            instructions: "Take with food, not more than 3 times daily",
-            prescribedBy: "Dr. Sarah Johnson",
-            refillsRemaining: 0,
-            icon: <Pill className="h-5 w-5" />
-          },
-          {
-            id: "4",
-            name: "Cetirizine",
-            dosage: "10mg",
-            frequency: "Once daily",
-            startDate: "2023-11-01",
-            endDate: "2023-12-01",
-            status: "active",
-            instructions: "Take before bed if drowsiness occurs",
-            prescribedBy: "Dr. James Davis",
-            refillsRemaining: 1,
-            nextDose: "10:00 PM",
-            icon: <Pill className="h-5 w-5" />
-          }
-        ];
-        
-        setMedications(dummyMedications);
       } catch (err) {
-        console.error("Error fetching medications:", err);
         setError(err.message || "Failed to load medications");
       } finally {
         setLoading(false);
       }
     };
-    
     fetchMedications();
   }, []);
+
+  const handleRequestRefill = async (prescriptionId, medicineId) => {
+    try {
+      setLoading(true);
+      const response = await medicineService.requestRefill(prescriptionId, medicineId);
+      alert(response.message || "Refill requested!");
+    } catch (err) {
+      alert(err.message || "Failed to request refill");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openMedicineDetails = (medicine) => {
+    setSelectedMedicine(medicine);
+    setDetailsOpen(true);
+  };
 
   const getStatusBadge = (status) => {
     switch (status) {
@@ -189,14 +145,21 @@ const PatientMedications = () => {
             <p className="text-blue-700 mt-1">Keep track of your prescriptions and dosages</p>
           </div>
           <div className="mt-4 md:mt-0">
-            <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center shadow-sm">
+            <button
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center shadow-sm"
+              onClick={() => {
+                activeMedications.forEach(med =>
+                  handleRequestRefill(med.prescriptionId, med._id)
+                );
+              }}
+            >
               <RefreshCw className="w-4 h-4 mr-2" />
               Request Refill
             </button>
           </div>
         </div>
       </div>
-      
+
       {/* Medication Reminders */}
       {activeMedications.length > 0 && (
         <div className="bg-white rounded-xl p-6 shadow-sm border border-blue-100">
@@ -206,7 +169,11 @@ const PatientMedications = () => {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {activeMedications.map((med) => (
-              <div key={`reminder-${med.id}`} className="bg-gradient-to-br from-blue-50 to-white rounded-xl p-5 shadow-sm border border-blue-100 hover:shadow-md transition-shadow">
+              <div
+                key={`reminder-${med._id}`}
+                className="bg-gradient-to-br from-blue-50 to-white rounded-xl p-5 shadow-sm border border-blue-100 hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => openMedicineDetails(med)}
+              >
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex items-center">
                     <div className="p-2 bg-blue-100 rounded-lg mr-3">
@@ -237,7 +204,7 @@ const PatientMedications = () => {
           </div>
         </div>
       )}
-      
+
       {/* Tabs */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         <div className="border-b border-gray-200">
@@ -264,33 +231,27 @@ const PatientMedications = () => {
             </button>
           </div>
         </div>
-        
+
         {activeTab === "current" && (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Medication
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Dosage & Frequency
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Duration
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Refills
-                  </th>
+                  <th>Medication</th>
+                  <th>Dosage & Frequency</th>
+                  <th>Duration</th>
+                  <th>Status</th>
+                  <th>Refills</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {activeMedications.map((medication) => (
-                  <tr key={medication.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
+                  <tr
+                    key={medication._id}
+                    className="hover:bg-gray-50 cursor-pointer"
+                    onClick={() => openMedicineDetails(medication)}
+                  >
+                    <td>
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
                           <Pill className="h-5 w-5 text-blue-500" />
@@ -301,11 +262,11 @@ const PatientMedications = () => {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td>
                       <div className="text-sm font-medium text-gray-900">{medication.dosage}</div>
                       <div className="text-sm text-gray-500">{medication.frequency}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td>
                       <div className="text-sm text-gray-900">
                         <div className="flex items-center">
                           <Calendar className="h-4 w-4 mr-1 text-blue-400" />
@@ -316,14 +277,18 @@ const PatientMedications = () => {
                         to {new Date(medication.endDate).toLocaleDateString()}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(medication.status)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td>{getStatusBadge(medication.status)}</td>
+                    <td>
                       {medication.refillsRemaining > 0 ? (
                         <div className="flex items-center">
                           <span className="mr-2">{medication.refillsRemaining} remaining</span>
-                          <button className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50">
+                          <button
+                            className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
+                            onClick={e => {
+                              e.stopPropagation();
+                              handleRequestRefill(medication.prescriptionId, medication._id);
+                            }}
+                          >
                             <RefreshCw className="h-4 w-4" />
                           </button>
                         </div>
@@ -337,15 +302,16 @@ const PatientMedications = () => {
             </table>
           </div>
         )}
-        
+
         {activeTab === "history" && (
           <div className="p-6">
             <div className="space-y-4">
               {completedMedications.length > 0 ? (
                 completedMedications.map((med) => (
-                  <div 
-                    key={`history-${med.id}`} 
-                    className="border-l-4 border-blue-300 pl-4 py-3 pr-4 bg-white rounded-r-lg hover:shadow-sm transition-shadow"
+                  <div
+                    key={`history-${med._id}`}
+                    className="border-l-4 border-blue-300 pl-4 py-3 pr-4 bg-white rounded-r-lg hover:shadow-sm transition-shadow cursor-pointer"
+                    onClick={() => openMedicineDetails(med)}
                   >
                     <div className="flex justify-between">
                       <div>
@@ -402,8 +368,15 @@ const PatientMedications = () => {
           </div>
         </div>
       </div>
+      
+      {/* Medicine Details Dialog */}
+      <MedicineDetailsDialog
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
+        medicine={selectedMedicine}
+      />
     </div>
   );
 };
 
-export default PatientMedications; 
+export default PatientMedications;

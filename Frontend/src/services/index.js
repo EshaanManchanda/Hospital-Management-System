@@ -1,5 +1,5 @@
 // Import all services except the ones creating circular dependencies
-import authService from './authService';
+import authService from './authservice';
 import doctorService from './doctorService';
 import appointmentService from './appointmentService';
 import adminService from './adminService';
@@ -24,7 +24,7 @@ const loadDependencies = async () => {
     const apiModule = await import('../utils/api');
     api = apiModule.default;
     
-    const patientServiceModule = await import('./patientService');
+    const patientServiceModule = await import('./patientservice');
     patientService = patientServiceModule.default;
   } catch (error) {
     console.error('Error loading dependencies:', error);

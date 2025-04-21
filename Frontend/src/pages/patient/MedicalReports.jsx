@@ -1,18 +1,17 @@
 import React, { useState, useEffect } from "react";
 import { Download, Upload, FileText, Plus, AlertCircle, Check } from "lucide-react";
-import { authService, getPatientService } from "../../services";
-
-// Define patientService at module level
-let patientService;
+import { authService } from "../../services";
+import medicalRecordService from "../../services/medicalRecordService";
+import MedicalRecordDetailsDialog from "../../components/dialogs/MedicalRecordDetailsDialog";
 
 const MedicalReports = () => {
   const [loading, setLoading] = useState(true);
   const [reports, setReports] = useState([]);
   const [error, setError] = useState(null);
-  const [isUploading, setIsUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(null);
   const [uploadError, setUploadError] = useState(null);
-  const [showUploadForm, setShowUploadForm] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   
   // Form state
   const [reportData, setReportData] = useState({
@@ -22,48 +21,24 @@ const MedicalReports = () => {
     file: null
   });
 
-  // Load patientService
-  useEffect(() => {
-    const loadPatientService = async () => {
-      try {
-        // Try first to get it from the getter
-        patientService = getPatientService();
-        
-        // If not available, import directly
-        if (!patientService) {
-          const module = await import('../../services/patientService');
-          patientService = module.default;
-        }
-      } catch (error) {
-        console.error("Error loading patientService:", error);
-        setError("Failed to load required services. Please refresh the page.");
-      }
-    };
-    
-    loadPatientService();
-  }, []);
-
   useEffect(() => {
     const fetchReports = async () => {
       try {
         setLoading(true);
-        
-        // Make sure patientService is loaded
-        if (!patientService) {
-          patientService = getPatientService();
-          if (!patientService) {
-            const module = await import('../../services/patientService');
-            patientService = module.default;
-          }
-        }
-        
+
         const userData = authService.getUserData();
         if (!userData || !userData.patientId) {
           throw new Error("Patient information not found");
         }
-        
-        const response = await patientService.getPatientReports(userData.patientId);
-        setReports(response.data || []);
+
+        // Fetch reports using medicalRecordService
+        const response = await medicalRecordService.getPatientMedicalRecords(userData.patientId);
+        if (response.success && response.data && response.data.medicalRecords) {
+          setReports(response.data.medicalRecords);
+        } else {
+          setReports([]);
+          setError(response.message || "Failed to load your medical reports");
+        }
       } catch (err) {
         console.error("Error fetching reports:", err);
         setError("Failed to load your medical reports");
@@ -74,91 +49,6 @@ const MedicalReports = () => {
 
     fetchReports();
   }, []);
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setReportData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    setReportData(prev => ({
-      ...prev,
-      file
-    }));
-  };
-
-  const handleUploadReport = async (e) => {
-    e.preventDefault();
-    try {
-      if (!reportData.file) {
-        setUploadError('Please select a file to upload');
-        return;
-      }
-      
-      if (!reportData.title.trim()) {
-        setUploadError('Please provide a title for the report');
-        return;
-      }
-      
-      setIsUploading(true);
-      setUploadError(null);
-      
-      // Make sure patientService is loaded
-      if (!patientService) {
-        patientService = getPatientService();
-        if (!patientService) {
-          const module = await import('../../services/patientService');
-          patientService = module.default;
-        }
-      }
-      
-      const userData = authService.getUserData();
-      if (!userData || !userData.patientId) {
-        throw new Error("Patient information not found");
-      }
-      
-      const formData = new FormData();
-      formData.append('file', reportData.file);
-      formData.append('title', reportData.title);
-      formData.append('type', reportData.type);
-      formData.append('notes', reportData.notes);
-      
-      const response = await patientService.uploadPatientReport(userData.patientId, formData);
-      
-      if (response.success) {
-        // Add the new report to the list
-        setReports(prev => [response.data, ...prev]);
-        
-        // Reset the form
-        setReportData({
-          title: "",
-          type: "",
-          notes: "",
-          file: null
-        });
-        
-        // Show success message
-        setUploadSuccess('Report uploaded successfully');
-        
-        // Hide the upload form
-        setTimeout(() => {
-          setShowUploadForm(false);
-          setUploadSuccess(null);
-        }, 2000);
-      } else {
-        setUploadError(response.message || 'Failed to upload report');
-      }
-    } catch (err) {
-      console.error('Error uploading report:', err);
-      setUploadError(err.message || 'Failed to upload report');
-    } finally {
-      setIsUploading(false);
-    }
-  };
 
   const handleDownload = (reportUrl, reportTitle) => {
     // Create a temporary anchor element to trigger download
@@ -201,130 +91,7 @@ const MedicalReports = () => {
         </div>
       )}
 
-      {/* Upload button */}
-      <div className="mb-6">
-        <button
-          onClick={() => setShowUploadForm(!showUploadForm)}
-          className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition flex items-center"
-        >
-          {showUploadForm ? (
-            <>
-              <span>Cancel Upload</span>
-            </>
-          ) : (
-            <>
-              <Plus className="h-4 w-4 mr-2" />
-              <span>Upload New Report</span>
-            </>
-          )}
-        </button>
-      </div>
-
-      {/* Upload form */}
-      {showUploadForm && (
-        <div className="bg-white rounded-lg shadow p-6 mb-8">
-          <h2 className="text-xl font-semibold mb-4">Upload Medical Report</h2>
-          
-          <form onSubmit={handleUploadReport}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">Report Title</label>
-                <input
-                  type="text"
-                  name="title"
-                  value={reportData.title}
-                  onChange={handleInputChange}
-                  className="block w-full rounded-md border border-gray-300 py-2 px-3 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  required
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">Report Type</label>
-                <select
-                  name="type"
-                  value={reportData.type}
-                  onChange={handleInputChange}
-                  className="block w-full rounded-md border border-gray-300 py-2 px-3 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  required
-                >
-                  <option value="">Select Type</option>
-                  <option value="Blood Test">Blood Test</option>
-                  <option value="X-Ray">X-Ray</option>
-                  <option value="MRI">MRI</option>
-                  <option value="CT Scan">CT Scan</option>
-                  <option value="Ultrasound">Ultrasound</option>
-                  <option value="ECG">ECG</option>
-                  <option value="Vaccination">Vaccination</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-            </div>
-            
-            <div className="mb-4 space-y-2">
-              <label className="block text-sm font-medium text-gray-700">Notes</label>
-              <textarea
-                name="notes"
-                value={reportData.notes}
-                onChange={handleInputChange}
-                rows="3"
-                className="block w-full rounded-md border border-gray-300 py-2 px-3 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                placeholder="Add any additional notes or context for this report"
-              ></textarea>
-            </div>
-            
-            <div className="mb-6 space-y-2">
-              <label className="block text-sm font-medium text-gray-700">Upload File</label>
-              <div className="flex items-center justify-center w-full">
-                <label className="flex flex-col w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
-                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                    <Upload className="h-10 w-10 text-gray-400 mb-2" />
-                    <p className="text-sm text-gray-500">
-                      <span className="font-medium">Click to upload</span> or drag and drop
-                    </p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      PDF, JPG, PNG up to 10MB
-                    </p>
-                    {reportData.file && (
-                      <p className="text-sm text-primary mt-2">
-                        {reportData.file.name}
-                      </p>
-                    )}
-                  </div>
-                  <input 
-                    type="file" 
-                    name="file" 
-                    className="hidden" 
-                    onChange={handleFileChange} 
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    required
-                  />
-                </label>
-              </div>
-            </div>
-            
-            <div className="flex justify-end">
-              <button
-                type="submit"
-                disabled={isUploading || !reportData.file}
-                className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isUploading ? (
-                  <>
-                    <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-                    Uploading...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="mr-2 h-4 w-4" />
-                    Upload Report
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+      {/* Upload button and form removed */}
 
       {/* Reports list */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -335,7 +102,14 @@ const MedicalReports = () => {
         {reports.length > 0 ? (
           <ul className="divide-y divide-gray-200">
             {reports.map((report) => (
-              <li key={report._id} className="p-6 hover:bg-gray-50 transition">
+              <li
+                key={report._id}
+                className="p-6 hover:bg-gray-50 transition cursor-pointer"
+                onClick={() => {
+                  setSelectedRecord(report);
+                  setDetailsOpen(true);
+                }}
+              >
                 <div className="flex items-start justify-between">
                   <div className="flex items-start space-x-4">
                     <div className="p-2 bg-primary/10 rounded-lg">
@@ -344,21 +118,30 @@ const MedicalReports = () => {
                     <div>
                       <h3 className="font-medium text-gray-800">{report.title}</h3>
                       <p className="text-sm text-gray-500">
-                        {report.type} • {new Date(report.uploadedDate).toLocaleDateString()}
+                        {report.type} • {report.date ? new Date(report.date).toLocaleDateString() : "N/A"}
                       </p>
                       {report.notes && (
                         <p className="text-sm text-gray-600 mt-1">{report.notes}</p>
                       )}
+                      {/* Removed the View Details button */}
                     </div>
                   </div>
-                  
-                  <button
-                    onClick={() => handleDownload(report.file, report.title)}
-                    className="inline-flex items-center px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition text-sm"
-                  >
-                    <Download className="h-4 w-4 mr-1" />
-                    Download
-                  </button>
+                  {report.file ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDownload(report.file, report.title);
+                      }}
+                      className="inline-flex items-center px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition text-sm"
+                    >
+                      <Download className="h-4 w-4 mr-1" />
+                      Download
+                    </button>
+                  ) : (
+                    <span className="text-sm text-red-500">
+                      Report is not published. Contact hospital.
+                    </span>
+                  )}
                 </div>
               </li>
             ))}
@@ -380,8 +163,14 @@ const MedicalReports = () => {
           </div>
         )}
       </div>
+      {/* Dialog for record details */}
+      <MedicalRecordDetailsDialog
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
+        record={selectedRecord}
+      />
     </div>
   );
 };
 
-export default MedicalReports; 
+export default MedicalReports;

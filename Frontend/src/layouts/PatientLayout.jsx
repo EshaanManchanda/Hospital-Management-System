@@ -42,19 +42,46 @@ const PatientLayout = ({ children }) => {
   
   // Load user data on mount
   useEffect(() => {
-    const fetchUserData = () => {
+    const fetchUserData = async () => {
       try {
         // Get user data from localStorage
         const storedUserData = authService.getUserData();
         if (storedUserData) {
+          // Check if patientId is missing but we have userId
+          if (!storedUserData.patientId && storedUserData.id && storedUserData.role === 'patient') {
+            console.log("PatientId missing, attempting to fetch patient data");
+            try {
+              // Import patientService dynamically to avoid circular dependencies
+              const { default: patientService } = await import('../services/patientservice');
+              
+              // First try to get patient by user ID
+              const response = await patientService.getPatientByUserId(storedUserData.id);
+              
+              if (response.success && response.data) {
+                console.log("Found patient data:", response.data);
+                // Update user data in localStorage with patientId
+                const updatedUserData = {
+                  ...storedUserData,
+                  patientId: response.data._id
+                };
+                authService.setUserData(updatedUserData);
+              }
+            } catch (error) {
+              console.error("Error fetching patient data:", error);
+              toast.error("Error loading patient data");
+            }
+          }
+          
+          // Update state with user data
           setUserData({
             name: storedUserData.name || storedUserData.firstName || "Patient",
             email: storedUserData.email || "",
-            avatar: storedUserData.profileImage || storedUserData.avatar || "https://randomuser.me/api/portraits/men/75.jpg"
+            avatar: storedUserData.picture || storedUserData.avatar || "https://randomuser.me/api/portraits/men/75.jpg"
           });
         }
       } catch (error) {
         console.error("Error fetching user data:", error);
+        toast.error("Error loading user data");
       }
     };
     

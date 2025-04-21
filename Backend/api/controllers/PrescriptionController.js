@@ -101,19 +101,27 @@ export const getPrescriptionsByPatient = async (req, res) => {
   try {
     const { patientId } = req.params;
     const { page = 1, limit = 10 } = req.query;
-    
-    // Check authorization
-    if (
-      req.user.role !== 'admin' && 
-      req.user.role !== 'doctor' && 
-      patientId !== req.user._id.toString()
+
+    // Improved authorization check for patient
+    if (req.user.role === 'patient') {
+      // Find the Patient document for this user
+      const patientDoc = await Patient.findOne({ user: req.user._id });
+      if (!patientDoc || patientId !== patientDoc._id.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to view these prescriptions'
+        });
+      }
+    } else if (
+      req.user.role !== 'admin' &&
+      req.user.role !== 'doctor'
     ) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to view these prescriptions'
       });
     }
-    
+
     // Calculate pagination values
     const skip = (parseInt(page) - 1) * parseInt(limit);
     
@@ -368,4 +376,4 @@ export const deletePrescription = async (req, res) => {
       error: error.message
     });
   }
-}; 
+};

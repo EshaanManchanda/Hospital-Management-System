@@ -7,16 +7,17 @@ import {
   forgotPassword, 
   resetPassword,
   loginWithGoogle,
-  getProfile,
-  updateProfile,
   refreshToken,
   logout,
   verifyToken,
-  me,
-  verifyResetToken
+  verifyResetToken,
+  googleCallback
 } from '../controllers/AuthController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { validateRequest, schemas } from '../middleware/validateRequest.js';
+import { User } from '../models/User.js';
+import { Patient } from '../models/Patient.js';
+import { Doctor } from '../models/Doctor.js';
 import bcrypt from 'bcrypt';
 
 const router = express.Router();
@@ -35,71 +36,18 @@ router.post('/google', loginWithGoogle);
 
 // Google OAuth routes
 router.get('/google', (req, res) => {
-  res.redirect('/api/auth/google/callback');
+  const redirectUrl = `${process.env.API_URL}/api/auth/google/callback`;
+  res.redirect(redirectUrl);
 });
 
-router.get('/google/callback', async (req, res) => {
-  try {
-    const { code } = req.query;
-    const { tokens } = await oauth2Client.getToken(code);
-    oauth2Client.setCredentials(tokens);
+router.get('/google/callback', googleCallback);
 
-    const { data } = await google.oauth2('v2').userinfo.get();
-    const { email, name, picture } = data;
-
-    // Check if user exists
-    let user = await User.findOne({ email });
-    let patientCreated = true;
-
-    if (!user) {
-      // Create new user
-      user = await User.create({
-        name,
-        email,
-        password: crypto.randomBytes(20).toString('hex'),
-        role: 'patient',
-        googleId: data.id,
-        avatar: picture
-      });
-      
-      // Try to create patient record but don't fail authentication if it fails
-      try {
-        const patient = await Patient.create({
-          user: user._id,
-          bloodGroup: 'O+', // Default blood group
-          height: 170, // Default height in cm
-          weight: 70, // Default weight in kg
-          allergies: [],
-          chronicDiseases: []
-        });
-      } catch (patientError) {
-        console.error('Error creating patient record during Google OAuth callback:', patientError);
-        patientCreated = false;
-      }
-    }
-
-    // Generate token
-    const token = generateToken(user._id);
-    
-    // If patient record creation failed, redirect with additional parameter
-    if (!patientCreated) {
-      return res.redirect(`${process.env.FRONTEND_URL}/auth/google/callback?token=${token}&setupNeeded=true`);
-    }
-
-    res.redirect(`${process.env.FRONTEND_URL}/auth/google/callback?token=${token}`);
-  } catch (error) {
-    console.error('Google OAuth callback error:', error);
-    res.redirect(`${process.env.FRONTEND_URL}/login?error=google_auth_failed`);
-  }
-});
-
-// Authentication routes
-router.get('/profile', protect, getUserProfile);
-router.put('/profile', protect, updateUserProfile);
-router.post('/auth/google', loginWithGoogle);
+// Token management
 router.post('/refresh', protect, refreshToken);
 router.post('/logout', logout);
 router.get('/verify-token', protect, verifyToken);
+
+// Test endpoint
 router.get('/google-test', (req, res) => {
   res.status(200).json({
     success: true,
@@ -252,4 +200,4 @@ router.post('/reset-debug-password', async (req, res) => {
   }
 });
 
-export default router; 
+export default router;

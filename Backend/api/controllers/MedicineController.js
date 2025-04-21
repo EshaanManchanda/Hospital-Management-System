@@ -5,34 +5,48 @@ import { Patient } from "../models/Patient.js";
 // Get all medicines
 export const getAllMedicines = async (req, res) => {
   try {
-    const { page = 1, limit = 10, category } = req.query;
-    
+    let { page = 1, limit = 10, category } = req.query;
+
+    // Ensure page and limit are numbers
+    page = parseInt(page) || 1;
+    limit = parseInt(limit) || 10;
+
     // Build query
     const query = {};
     if (category) {
+      // Validate category against allowed enums
+      const allowedCategories = [
+        'Tablet', 'Capsule', 'Syrup', 'Injection', 'Cream', 'Ointment', 'Drops', 'Inhaler', 'Other'
+      ];
+      if (!allowedCategories.includes(category)) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid category. Allowed: ${allowedCategories.join(', ')}`
+        });
+      }
       query.category = category;
     }
-    
+
     // Calculate pagination values
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    
+    const skip = (page - 1) * limit;
+
     // Get medicines with pagination
     const medicines = await Medicine.find(query)
       .sort({ name: 1 })
       .skip(skip)
-      .limit(parseInt(limit));
-    
+      .limit(limit);
+
     // Get total count for pagination
     const total = await Medicine.countDocuments(query);
-    
+
     res.status(200).json({
       success: true,
       data: {
         medicines,
         pagination: {
           total,
-          page: parseInt(page),
-          pages: Math.ceil(total / parseInt(limit))
+          page,
+          pages: Math.ceil(total / limit)
         }
       }
     });
@@ -400,15 +414,15 @@ export const getPrescriptionById = async (req, res) => {
           select: 'name email'
         }
       })
-      .populate('medications.medicine');
-    
+      .populate('medicines.medicine'); // <-- changed from medications.medicine to medicines.medicine
+
     if (!prescription) {
       return res.status(404).json({ 
         success: false, 
         message: "Prescription not found" 
       });
     }
-    
+
     res.status(200).json({ success: true, data: prescription });
   } catch (error) {
     console.error("Error fetching prescription:", error);
@@ -424,7 +438,7 @@ export const getPrescriptionById = async (req, res) => {
 export const dispensePrescription = async (req, res) => {
   try {
     const prescription = await Prescription.findById(req.params.id)
-      .populate('medications.medicine');
+      .populate('medicines.medicine');
     
     if (!prescription) {
       return res.status(404).json({ 
@@ -442,7 +456,7 @@ export const dispensePrescription = async (req, res) => {
     }
     
     // Check stock levels for all medications
-    for (const med of prescription.medications) {
+    for (const med of prescription.medicines) {
       const medicine = med.medicine;
       
       if (medicine.stock <= 0) {
@@ -583,4 +597,64 @@ export const getMedicineStats = async (req, res) => {
       error: error.message 
     });
   }
-}; 
+};
+
+// Get all medications for a patient
+export const getMedicationsByPatient = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    // Find all prescriptions for this patient
+    const prescriptions = await Prescription.find({ patient: patientId })
+      .populate('medicines.medicine')
+      .populate('doctor', 'user specialization')
+      .sort({ createdAt: -1 });
+
+    // Flatten all medicines from prescriptions
+    const medications = [];
+    prescriptions.forEach(prescription => {
+      prescription.medicines.forEach(med => {
+        medications.push({
+          ...med.medicine._doc,
+          dosage: med.dosage,
+          frequency: med.frequency,
+          startDate: prescription.startDate,
+          endDate: prescription.endDate,
+          status: prescription.endDate && new Date(prescription.endDate) < new Date() ? 'completed' : 'active',
+          instructions: med.notes || prescription.additionalInstructions,
+          prescribedBy: prescription.doctor?.user?.name || '',
+          refillsRemaining: med.refillsRemaining || 0,
+          prescriptionId: prescription._id,
+        });
+      });
+    });
+
+    res.status(200).json({
+      success: true,
+      data: medications
+    });
+  } catch (error) {
+    console.error("Error fetching patient medications:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message
+    });
+  }
+};
+
+// Request a refill for a medication
+export const requestRefill = async (req, res) => {
+  try {
+    const { prescriptionId, medicineId } = req.body;
+    // Here you could create a notification, or update prescription status, etc.
+    // For now, just respond with success
+    res.status(200).json({ success: true, message: "Refill request submitted." });
+  } catch (error) {
+    console.error("Error requesting refill:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message
+    });
+  }
+};

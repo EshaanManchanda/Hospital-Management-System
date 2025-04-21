@@ -6,7 +6,7 @@ import { FaHospital, FaUserMd, FaLaptopMedical, FaShieldAlt, FaGoogle } from "re
 import LoginForm from "../../components/shared/LoginForm";
 import { useAuth } from '../../contexts/AuthContext';
 import { useGoogleAuth } from '../../contexts/GoogleAuthContext';
-import authService from '../../services/authService';
+import authService from '../../services/authservice';
 import { toast } from 'react-hot-toast';
 
 const Login = () => {

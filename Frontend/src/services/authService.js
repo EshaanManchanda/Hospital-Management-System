@@ -5,6 +5,19 @@ import { API_BASE_URL } from '../config/constants';
  * Authentication service for login, registration, and user profile management
  */
 
+// Helper function to get auth token
+const getAuthToken = () => {
+  const token = localStorage.getItem('token');
+  return token ? `Bearer ${token}` : '';
+};
+
+// Helper function to set auth headers
+const getAuthHeaders = () => {
+  return {
+    'Authorization': getAuthToken(),
+    'Content-Type': 'application/json'
+  };
+};
 // Helper function to generate a secure random password
 const generateSecurePassword = () => {
   // Create a strong password with uppercase, lowercase, numbers and special characters
@@ -91,7 +104,7 @@ const login = async (emailOrData, password) => {
     
     try {
       // First try with '/api/auth/login' path (standard format)
-      const response = await api.post('/api/auth/login', requestData);
+      const response = await api.post('/api/auth/login', requestData, { headers: getAuthHeaders() });
       const data = response.data;
       
       console.log('Login response received:', { 
@@ -171,7 +184,7 @@ const login = async (emailOrData, password) => {
       if (authError.response?.status === 404) {
         console.log('Trying alternative API endpoint: /auth/login');
         try {
-          const altResponse = await api.post('/auth/login', requestData);
+          const altResponse = await api.post('/auth/login', requestData, { headers: getAuthHeaders() });
           const altData = altResponse.data;
           
           console.log('Alternative login response:', altData);
@@ -288,11 +301,11 @@ const verifyToken = async () => {
         let response;
         if (endpoint.method === 'get') {
           response = await api.get(endpoint.url, {
-            headers: { Authorization: `Bearer ${token}` }
+            headers: getAuthHeaders()
           });
         } else {
           response = await api.post(endpoint.url, {}, {
-            headers: { Authorization: `Bearer ${token}` }
+            headers: getAuthHeaders()
           });
         }
         
@@ -313,7 +326,6 @@ const verifyToken = async () => {
     }
     
     // If we got here, all endpoints failed
-    console.error('All verification endpoints failed');
     
     // Use userData from localStorage as fallback
     const userDataStr = localStorage.getItem('userData');
@@ -355,6 +367,9 @@ const logout = async () => {
   try {
     console.log('Performing logout operation');
     
+    // Store token before clearing for API calls
+    const headers = getAuthHeaders();
+    
     // First, clear local storage and API headers
     localStorage.removeItem('token');
     localStorage.removeItem('userData');
@@ -368,19 +383,14 @@ const logout = async () => {
     
     // Then try to call the server API, but don't depend on its success
     try {
-      const token = localStorage.getItem('token');
-      if (token) {
+      if (headers.Authorization) {
         console.log('Calling logout API endpoint');
         // Try both endpoints
         try {
-          await api.post('/api/auth/logout', {}, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
+          await api.post('/api/auth/logout', {}, { headers });
         } catch (error) {
           // Fallback to alternative endpoint
-          await api.post('/auth/logout', {}, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
+          await api.post('/auth/logout', {}, { headers });
         }
       }
     } catch (apiError) {
@@ -414,7 +424,7 @@ const handleGoogleCallback = async (token, password) => {
 
     // Store token
     localStorage.setItem('token', token);
-    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    api.defaults.headers.common['Authorization'] = getAuthToken();
 
     // Default to a generated password if none is provided
     const securePassword = password || generateSecurePassword();
@@ -422,7 +432,7 @@ const handleGoogleCallback = async (token, password) => {
 
     // First verify the token
     const verifyResponse = await api.get('/api/auth/verify-token', {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: getAuthHeaders(),
     });
 
     if (!verifyResponse.data || !verifyResponse.data.success) {
@@ -433,7 +443,7 @@ const handleGoogleCallback = async (token, password) => {
     try {
       // Try to fetch existing patient profile first
       const patientResponse = await api.get('/api/patients/me', {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: getAuthHeaders(),
       });
       
       if (patientResponse.data && patientResponse.data.success) {
@@ -509,7 +519,7 @@ const handleGoogleCallback = async (token, password) => {
     
       // Create patient profile
       const patientResponse = await api.post('/api/patients', createPatientData, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: getAuthHeaders(),
       });
       
       // Format response to match expected structure
@@ -546,15 +556,17 @@ const handleGoogleCallback = async (token, password) => {
         let patientId;
         try {
           patientId = 
+            patientResponse.data.data?._id || 
+            patientResponse.data.data?.id || 
             patientResponse.data.patient?._id || 
             patientResponse.data.patient?.id || 
-            patientResponse.data._id ||
+            patientResponse.data._id || 
             patientResponse.data.id;
           
           if (!patientId) {
             console.error('Failed to extract patient ID from response:', {
               responseData: patientResponse.data,
-              possibleLocations: ['data.patient._id', 'data.patient.id', 'data._id', 'data.id']
+              possibleLocations: ['data.data._id', 'data.data.id', 'data.patient._id', 'data.patient.id', 'data._id', 'data.id']
             });
             throw new Error('Patient ID not found in expected response locations');
           }
@@ -672,7 +684,7 @@ const register = async (userData) => {
     
     // Try registering with the standard endpoint
     try {
-      const response = await api.post('/api/auth/register', requestData);
+      const response = await api.post('/api/auth/register', requestData, { headers: getAuthHeaders() });
       const data = response.data;
 
       if (!data || !data.success) {
@@ -880,12 +892,55 @@ const loginWithGoogle = async (googleData) => {
       throw new Error('Invalid authentication token format');
     }
 
+    // Extract all role-specific IDs
     const userData = {
       userId: data.user.id || data.user._id,
-      name: data.user.name,
-      email: data.user.email,
-      role: data.user.role,
+      name: data.user.name || '',
+      email: data.user.email || '',
+      role: data.user.role || 'patient',
+      picture: data.user.picture || '',
+      role_id: data.user[`${data.user.role}Id`] || data.user.userId || data.user.id || data.user._id
     };
+    
+    // Add role-specific IDs if they exist
+    if (data.user.patientId) userData.patientId = data.user.patientId;
+    if (data.user.doctorId) userData.doctorId = data.user.doctorId;
+    if (data.user.adminId) userData.adminId = data.user.adminId;
+    if (data.user.nurseId) userData.nurseId = data.user.nurseId;
+    if (data.user.receptionistId) userData.receptionistId = data.user.receptionistId;
+    
+    // If we have a patient role but no patientId, try to extract it from other locations
+    if (userData.role === 'patient' && !userData.patientId) {
+      const possiblePatientIds = [
+        data.patientId,
+        data.patient?._id,
+        data.patient?.id,
+        data.data?.patientId,
+        data.data?.patient?._id,
+        data.data?.patient?.id,
+        data.data?._id,
+        data.data?.id
+      ];
+      
+      // Find the first non-null ID
+      const extractedPatientId = possiblePatientIds.find(id => id);
+      if (extractedPatientId) {
+        userData.patientId = extractedPatientId;
+        console.log('Extracted patient ID from alternative location:', extractedPatientId);
+      } else {
+        console.warn('No patient ID found for patient role user');
+      }
+    }
+    
+    console.log('Google login successful, user data:', {
+      userId: userData.userId,
+      role: userData.role,
+      hasPatientId: !!userData.patientId,
+      hasDoctorId: !!userData.doctorId,
+      hasAdminId: !!userData.adminId,
+      hasNurseId: !!userData.nurseId,
+      hasReceptionistId: !!userData.receptionistId
+    });
 
     // Store token and user data
     localStorage.setItem('token', data.token);
@@ -903,7 +958,7 @@ const loginWithGoogle = async (googleData) => {
 const forgotPassword = async (email) => {
   try {
     console.log(`Requesting password reset for email: ${email}`);
-    const response = await api.post('/api/auth/forgot-password', { email });
+    const response = await api.post('/api/auth/forgot-password', { email }, { headers: getAuthHeaders() });
     
     if (response.data && response.data.success) {
       return { 
@@ -932,7 +987,7 @@ const resetPassword = async (token, newPassword) => {
     const response = await api.post('/api/auth/reset-password', { 
       token, 
       password: newPassword 
-    });
+    }, { headers: getAuthHeaders() });
     
     if (response.data && response.data.success) {
       return { 

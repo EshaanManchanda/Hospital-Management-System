@@ -92,7 +92,15 @@ const appointmentService = {
    */
   updateAppointment: async (id, appointmentData) => {
     try {
-      const response = await api.put(`/api/appointments/${id}`, appointmentData);
+      const token = localStorage.getItem('token');
+      const headers = token
+        ? { Authorization: `Bearer ${token}` }
+        : {};
+      const response = await api.put(
+        `/api/appointments/${id}`,
+        appointmentData,
+        { headers }
+      );
       return response.data;
     } catch (error) {
       console.error('Update appointment error:', error);

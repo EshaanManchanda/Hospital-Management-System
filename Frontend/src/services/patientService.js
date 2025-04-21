@@ -306,38 +306,39 @@ const patientService = {
     }
   },
   
-  /**
-   * Get patient medical records
-   * @param {string} id - Patient ID
-   * @returns {Promise<Object>} - Medical records data
-   */
-  async getPatientMedicalRecords(id) {
-    try {
-      if (!api) {
-        api = (await import('../utils/api')).default;
-      }
-      
-      const config = { headers: getAuthHeaders() };
-      const response = await api.get(`/api/patients/${id}/medical-records`, config);
-      
-      if (response.data && response.data.success) {
-        return {
-          success: true,
-          records: response.data.data,
-          message: response.data.message
-        };
-      }
-      
-      return {
-        success: false,
-        records: null,
-        message: response.data?.message || 'Failed to fetch medical records'
-      };
-    } catch (error) {
-      console.error(`Error fetching medical records for patient ${id}:`, error);
-      throw error;
-    }
-  },
+  // Remove this block:
+  // /**
+  //  * Get patient medical records
+  //  * @param {string} id - Patient ID
+  //  * @returns {Promise<Object>} - Medical records data
+  //  */
+  // async getPatientMedicalRecords(id) {
+  //   try {
+  //     if (!api) {
+  //       api = (await import('../utils/api')).default;
+  //     }
+  //     
+  //     const config = { headers: getAuthHeaders() };
+  //     const response = await api.get(`/api/patients/${id}/medical-records`, config);
+  //     
+  //     if (response.data && response.data.success) {
+  //       return {
+  //         success: true,
+  //         records: response.data.data,
+  //         message: response.data.message
+  //       };
+  //     }
+  //     
+  //     return {
+  //       success: false,
+  //       records: null,
+  //       message: response.data?.message || 'Failed to fetch medical records'
+  //     };
+  //   } catch (error) {
+  //     console.error(`Error fetching medical records for patient ${id}:`, error);
+  //     throw error;
+  //   }
+  // },
   
   /**
    * Update patient medical records
@@ -392,6 +393,42 @@ const patientService = {
     } catch (error) {
       console.error('Error parsing localStorage data:', error);
       return { user: null, patient: null, token: null };
+    }
+  },
+  /**
+   * Get a patient by user ID
+   * @param {string} userId - User ID
+   * @returns {Promise<Object>} - Patient data
+   */
+  async getPatientByUserId(userId) {
+    try {
+      if (!api) {
+        api = (await import('../utils/api')).default;
+      }
+      
+      const config = { headers: getAuthHeaders() };
+      const response = await api.get(`/api/patients/user/${userId}`, config);
+      
+      if (response.data && response.data.success) {
+        return {
+          success: true,
+          patient: response.data.data,
+          message: response.data.message
+        };
+      }
+      
+      return {
+        success: false,
+        patient: null,
+        message: response.data?.message || 'Failed to fetch patient by user ID'
+      };
+    } catch (error) {
+      console.error(`Error fetching patient with user ID ${userId}:`, error);
+      return {
+        success: false,
+        patient: null,
+        message: error.response?.data?.message || 'Error fetching patient data'
+      };
     }
   },
 };

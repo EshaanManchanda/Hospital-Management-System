@@ -10,9 +10,14 @@ export const getAllAppointments = async (req, res) => {
     
     // If user is a patient, only show their appointments
     if (req.user.role === 'patient') {
-      query.patient = req.user._id;
+      // Find the Patient document for this user
+      const patientDoc = await Patient.findOne({ user: req.user._id });
+      if (!patientDoc) {
+        return res.status(404).json({ success: false, message: "Patient profile not found" });
+      }
+      query.patient = patientDoc._id;
     }
-    
+
     // If user is a doctor, only show their appointments
     if (req.user.role === 'doctor') {
       // Find the doctor profile associated with this user
@@ -21,7 +26,7 @@ export const getAllAppointments = async (req, res) => {
         query.doctor = doctorProfile._id;
       }
     }
-    
+
     const appointments = await Appointment.find(query)
       .populate({
         path: 'patient',
@@ -93,42 +98,57 @@ export const createAppointment = async (req, res) => {
     
     // Validate required fields
     if (!doctorId || !date || !time) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Doctor ID, date, and time are required fields" 
+      return res.status(400).json({
+        success: false,
+        message: "Doctor ID, date, and time are required fields"
       });
     }
-    
-    // Set patient as the logged-in user if not admin
-    let patientId = req.user._id;
-    
-    // If admin, they can create appointment for any patient
+
+    let patientId;
+
     if (req.user.role === 'admin' && req.body.patientId) {
+      // Admin can create appointment for any patient
       patientId = req.body.patientId;
+    } else if (req.user.role === 'patient') {
+      // Patient can only create appointment for themselves
+      // Find the Patient document by user ID
+      const patientDoc = await Patient.findOne({ user: req.user._id });
+      if (!patientDoc) {
+        return res.status(404).json({ success: false, message: "Patient profile not found for this user" });
+      }
+      patientId = patientDoc._id;
+    } else {
+      // For other roles, not allowed
+      return res.status(403).json({ success: false, message: "Not authorized to create appointment" });
     }
-    
+
     // Check if doctor exists
     const doctor = await Doctor.findById(doctorId);
     if (!doctor) {
       return res.status(404).json({ success: false, message: "Doctor not found" });
     }
-    
+
     // Check if patient exists from Patient model
-    const patient = await Patient.findById(patientId);
+    let patient = await Patient.findById(patientId);
     if (!patient) {
+      // Try finding by user field if not found by _id
+      patient = await Patient.findOne({ user: patientId });
+    }
+    if (!patient) {
+      console.log("Patient not found in DB for ID or user:", patientId);
       return res.status(404).json({ success: false, message: "Patient not found" });
     }
 
     // Format date properly to avoid timezone issues
     const appointmentDate = new Date(date);
-    
+
     // Reset hours to avoid timezone issues when checking availability
     const startOfDay = new Date(appointmentDate);
     startOfDay.setHours(0, 0, 0, 0);
-    
+
     const endOfDay = new Date(appointmentDate);
     endOfDay.setHours(23, 59, 59, 999);
-    
+
     // Check for time slot availability
     const existingAppointment = await Appointment.findOne({
       doctor: doctorId,
@@ -139,55 +159,51 @@ export const createAppointment = async (req, res) => {
       time,
       status: { $nin: ['cancelled', 'no-show'] }
     });
-    
+
     if (existingAppointment) {
       return res.status(400).json({ success: false, message: "This time slot is already booked" });
     }
-    
+
     // Prepare symptoms array if it's a string
     let processedSymptoms = symptoms;
     if (typeof symptoms === 'string') {
-      // If it's a non-empty string, keep it as is
       processedSymptoms = symptoms || '';
     } else if (Array.isArray(symptoms)) {
-      // If it's an empty array, convert to empty string
-      // If it's a non-empty array, join with commas
       processedSymptoms = symptoms.length > 0 ? symptoms.join(', ') : '';
     } else {
-      // If it's undefined, null, or any other type, use empty string
       processedSymptoms = '';
     }
-    
+
     // Create new appointment with default values for optional fields
     const appointmentData = {
       patient: patientId,
       doctor: doctorId,
       date: appointmentDate,
       time,
-      type: type?.toLowerCase() || 'consultation', // Convert to lowercase
+      type: type?.toLowerCase() || 'consultation',
       description: description || '',
       symptoms: processedSymptoms,
       status: 'scheduled',
       paymentStatus: 'pending',
       paymentAmount: doctor.fee || 0
     };
-    
+
     // Create new appointment
     const appointment = await Appointment.create(appointmentData);
-    
+
     // Add appointment to doctor's appointments if the field exists
     if (Array.isArray(doctor.appointments)) {
       doctor.appointments.push(appointment._id);
       await doctor.save();
     }
-    
+
     res.status(201).json({ success: true, data: appointment });
   } catch (error) {
     console.error("Error creating appointment:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Failed to create appointment", 
-      error: error.message 
+    res.status(500).json({
+      success: false,
+      message: "Failed to create appointment",
+      error: error.message
     });
   }
 };
@@ -219,9 +235,12 @@ export const updateAppointment = async (req, res) => {
     // Check authorization
     // Patients can only update their own appointment and only certain fields
     if (req.user.role === 'patient') {
-      if (appointment.patient.toString() !== req.user._id.toString()) {
+      // Find the Patient document for this user
+      const patientDoc = await Patient.findOne({ user: req.user._id });
+      if (!patientDoc || appointment.patient.toString() !== patientDoc._id.toString()) {
         return res.status(403).json({ success: false, message: "Not authorized to update this appointment" });
       }
+    }
       
       // Patients can only update certain fields
       if (date) appointment.date = date;
@@ -234,7 +253,6 @@ export const updateAppointment = async (req, res) => {
       if (status === 'cancelled') {
         appointment.status = status;
       }
-    } 
     // Doctors can update medical details
     else if (req.user.role === 'doctor') {
       const doctorProfile = await Doctor.findOne({ user: req.user._id });

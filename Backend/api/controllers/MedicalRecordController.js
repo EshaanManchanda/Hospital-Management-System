@@ -41,24 +41,35 @@ export const getAllMedicalRecords = async (req, res) => {
 export const getMedicalRecordById = async (req, res) => {
   try {
     const medicalRecord = await MedicalRecord.findById(req.params.id)
-      .populate('patient', 'name contactNumber email address dateOfBirth gender bloodGroup')
+      .populate({
+        path: 'patient',
+        select: 'name contactNumber email address dateOfBirth gender bloodGroup user',
+        populate: { path: 'user', select: '_id' }
+      })
       .populate('doctor', 'name specialization');
-    
+
     if (!medicalRecord) {
       return res.status(404).json({
         success: false,
         message: 'Medical record not found'
       });
     }
-    
-    // Simplified authorization check
-    if (req.user.role === 'patient' && medicalRecord.patient._id.toString() !== req.user._id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to view this medical record'
-      });
+
+    // Robust authorization check for patient
+    if (req.user.role === 'patient') {
+      // If patient or patient.user is missing, deny access
+      if (
+        !medicalRecord.patient ||
+        !medicalRecord.patient.user ||
+        medicalRecord.patient.user._id.toString() !== req.user._id.toString()
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to view this medical record'
+        });
+      }
     }
-    
+
     res.status(200).json({
       success: true,
       data: medicalRecord
@@ -81,11 +92,15 @@ export const getPatientMedicalRecords = async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
     
     // Simplified authorization check
-    if (req.user.role === 'patient' && patientId !== req.user._id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to view these medical records'
-      });
+    if (req.user.role === 'patient') {
+      // Find the Patient document for this user
+      const patientDoc = await Patient.findOne({ user: req.user._id });
+      if (!patientDoc || patientId !== patientDoc._id.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to view these medical records'
+        });
+      }
     }
     
     const medicalRecords = await MedicalRecord.find({ patient: patientId })

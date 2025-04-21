@@ -1,36 +1,41 @@
 // We'll use dynamic imports to avoid circular dependencies
 let api = null;
 
-
 const getAuthToken = () => {
   const token = localStorage.getItem('token');
   return token ? `Bearer ${token}` : '';
 };
 
-// Helper function to set auth headers
+// Helper function to set auth headers for JSON requests
 const getAuthHeaders = () => {
   return {
     'Authorization': getAuthToken(),
     'Content-Type': 'application/json'
   };
 };
+
+// Helper function to set auth headers for multipart/form-data requests
+const getMultipartHeaders = () => {
+  return {
+    'Authorization': getAuthToken()
+    // Do not set Content-Type here; let the browser set it for FormData
+  };
+};
+
 const medicalRecordService = {
   /**
    * Get all medical records with pagination
+   * GET /api/medical-records?page=1&limit=10
    */
-
-  
   getAllMedicalRecords: async (page = 1, limit = 10) => {
     try {
       if (!api) {
         api = (await import('../utils/api')).default;
       }
-      
       const config = {
         headers: getAuthHeaders(),
         params: { page, limit }
       };
-      
       const response = await api.get('/api/medical-records', config);
       return response.data;
     } catch (error) {
@@ -44,14 +49,14 @@ const medicalRecordService = {
   },
 
   /**
-   * Get medical record by ID
+   * Get a medical record by ID
+   * GET /api/medical-records/:id
    */
   getMedicalRecordById: async (id) => {
     try {
       if (!api) {
         api = (await import('../utils/api')).default;
       }
-      
       const config = { headers: getAuthHeaders() };
       const response = await api.get(`/api/medical-records/${id}`, config);
       return response.data;
@@ -66,19 +71,18 @@ const medicalRecordService = {
   },
 
   /**
-   * Get medical records by patient ID
+   * Get all medical records for a specific patient
+   * GET /api/medical-records/patient/:patientId?page=1&limit=10
    */
   getPatientMedicalRecords: async (patientId, page = 1, limit = 10) => {
     try {
       if (!api) {
         api = (await import('../utils/api')).default;
       }
-      
       const config = {
         headers: getAuthHeaders(),
         params: { page, limit }
       };
-      
       const response = await api.get(`/api/medical-records/patient/${patientId}`, config);
       return response.data;
     } catch (error) {
@@ -92,19 +96,18 @@ const medicalRecordService = {
   },
 
   /**
-   * Get medical records by doctor ID
+   * Get all medical records for a specific doctor
+   * GET /api/medical-records/doctor/:doctorId?page=1&limit=10
    */
   getDoctorMedicalRecords: async (doctorId, page = 1, limit = 10) => {
     try {
       if (!api) {
         api = (await import('../utils/api')).default;
       }
-      
       const config = {
         headers: getAuthHeaders(),
         params: { page, limit }
       };
-      
       const response = await api.get(`/api/medical-records/doctor/${doctorId}`, config);
       return response.data;
     } catch (error) {
@@ -119,14 +122,20 @@ const medicalRecordService = {
 
   /**
    * Create a new medical record
+   * POST /api/medical-records
+   * If uploading files, use FormData and getMultipartHeaders
    */
-  createMedicalRecord: async (recordData) => {
+  createMedicalRecord: async (recordData, isMultipart = false) => {
     try {
       if (!api) {
         api = (await import('../utils/api')).default;
       }
-      
-      const config = { headers: getAuthHeaders() };
+      let config;
+      if (isMultipart) {
+        config = { headers: getMultipartHeaders() };
+      } else {
+        config = { headers: getAuthHeaders() };
+      }
       const response = await api.post('/api/medical-records', recordData, config);
       return response.data;
     } catch (error) {
@@ -141,14 +150,20 @@ const medicalRecordService = {
 
   /**
    * Update a medical record
+   * PUT /api/medical-records/:id
+   * If uploading files, use FormData and getMultipartHeaders
    */
-  updateMedicalRecord: async (id, recordData) => {
+  updateMedicalRecord: async (id, recordData, isMultipart = false) => {
     try {
       if (!api) {
         api = (await import('../utils/api')).default;
       }
-      
-      const config = { headers: getAuthHeaders() };
+      let config;
+      if (isMultipart) {
+        config = { headers: getMultipartHeaders() };
+      } else {
+        config = { headers: getAuthHeaders() };
+      }
       const response = await api.put(`/api/medical-records/${id}`, recordData, config);
       return response.data;
     } catch (error) {
@@ -163,13 +178,13 @@ const medicalRecordService = {
 
   /**
    * Delete a medical record
+   * DELETE /api/medical-records/:id
    */
   deleteMedicalRecord: async (id) => {
     try {
       if (!api) {
         api = (await import('../utils/api')).default;
       }
-      
       const config = { headers: getAuthHeaders() };
       const response = await api.delete(`/api/medical-records/${id}`, config);
       return response.data;
@@ -185,13 +200,13 @@ const medicalRecordService = {
 
   /**
    * Get medical records statistics
+   * GET /api/medical-records/stats
    */
   getMedicalRecordsStats: async () => {
     try {
       if (!api) {
         api = (await import('../utils/api')).default;
       }
-      
       const config = { headers: getAuthHeaders() };
       const response = await api.get('/api/medical-records/stats', config);
       return response.data;
@@ -207,20 +222,17 @@ const medicalRecordService = {
 
   /**
    * Add attachment to medical record
+   * POST /api/medical-records/:id/attachments
+   * attachmentData should be FormData
    */
   addAttachment: async (id, attachmentData) => {
     try {
       if (!api) {
         api = (await import('../utils/api')).default;
       }
-      
-      const config = { 
-        headers: {
-          ...getAuthHeaders(),
-          'Content-Type': 'multipart/form-data'
-        }
+      const config = {
+        headers: getMultipartHeaders()
       };
-      
       const response = await api.post(`/api/medical-records/${id}/attachments`, attachmentData, config);
       return response.data;
     } catch (error) {

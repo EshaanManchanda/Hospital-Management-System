@@ -30,7 +30,7 @@ import { Textarea } from "@/components/admin/ui/textarea";
 import { Label } from "@/components/admin/ui/label";
 import { ScrollArea } from "@/components/admin/ui/scroll-area";
 // Fix the imports to use direct imports instead of from index
-import patientService from "../../services/patientService";
+import patientService from "../../services/patientservice";
 import doctorService from "../../services/doctorService";
 import medicalRecordService from "../../services/medicalRecordService";
 import { toast } from "react-hot-toast";

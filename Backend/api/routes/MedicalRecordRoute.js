@@ -114,4 +114,18 @@ router.use((error, req, res, next) => {
   next();
 });
 
+// Get all medical records
+router.get('/', protect, authorize('admin', 'doctor'), getAllMedicalRecords);
+
+// Get a medical record by ID
+router.get('/:id', protect, getMedicalRecordById);
+
+// Add these routes to use the unused controller functions
+
+// Get all medical records for a specific patient
+router.get('/patient/:patientId', protect, authorize('admin', 'doctor', 'patient'), getPatientMedicalRecords);
+
+// Get all medical records for a specific doctor
+router.get('/doctor/:doctorId', protect, authorize('admin', 'doctor'), getDoctorMedicalRecords);
+
 export default router;

@@ -23,7 +23,7 @@ const PatientDashboard = () => {
         
         // If not available, import directly
         if (!patientService) {
-          const module = await import('../../services/patientService');
+          const module = await import('../../services/patientservice');
           patientService = module.default;
         }
       } catch (error) {
@@ -79,7 +79,7 @@ const PatientDashboard = () => {
         if (!patientService) {
           patientService = getPatientService();
           if (!patientService) {
-            const module = await import('../../services/patientService');
+            const module = await import('../../services/patientservice');
             patientService = module.default;
           }
         }

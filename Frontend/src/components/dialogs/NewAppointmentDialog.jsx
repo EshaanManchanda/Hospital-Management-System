@@ -175,8 +175,16 @@ const NewAppointmentDialog = ({ open, onOpenChange }) => {
         throw new Error("Please select a time");
       }
       
+      // Get patientId from localStorage (or from your auth context if available)
+      let patientId = "";
+      try {
+        const userData = JSON.parse(localStorage.getItem("userData"));
+        patientId = userData?.patientId || "";
+      } catch {}
+      
       // Create the appointment payload
       const appointmentPayload = {
+        patientId, // include patientId if available
         doctorId: appointmentData.doctorId,
         date: appointmentData.date,
         time: appointmentData.time,
