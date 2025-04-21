@@ -52,7 +52,7 @@ const PatientLayout = ({ children }) => {
             console.log("PatientId missing, attempting to fetch patient data");
             try {
               // Import patientService dynamically to avoid circular dependencies
-              const { default: patientService } = await import('../services/patientservice');
+              const { default: patientService } = await import('../services/patientService');
               
               // First try to get patient by user ID
               const response = await patientService.getPatientByUserId(storedUserData.id);
