@@ -61,7 +61,7 @@ const ContactUs = () => {
       icon: <FaEnvelope className="h-6 w-6" />,
       title: "Email",
       details: [
-        "eshaanmanchanda01@gmail.com"
+        "dastejindersingh592@gmail.com"
       ]
     },
     {
@@ -261,7 +261,7 @@ const ContactUs = () => {
               
               <div className="space-y-4">
                 <a 
-                  href="https://www.linkedin.com/in/eshaan-manchanda/" 
+                  href="https://www.linkedin.com/in/das-tejinder-singh-038795233/" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="flex items-center p-3 bg-blue-700 rounded-lg hover:bg-blue-600 transition-colors duration-300"
@@ -283,7 +283,7 @@ const ContactUs = () => {
                 </a>
                 
                 <a 
-                  href="mailto:eshaanmanchanda01@gmail.com" 
+                  href="mailto:dastejindersingh592@gmail.com" 
                   className="flex items-center p-3 bg-blue-700 rounded-lg hover:bg-blue-600 transition-colors duration-300"
                 >
                   <FaEnvelope className="h-6 w-6 mr-3" />
