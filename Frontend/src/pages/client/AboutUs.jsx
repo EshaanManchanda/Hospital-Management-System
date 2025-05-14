@@ -92,7 +92,7 @@ const AboutUs = () => {
         </motion.div>
 
         {/* Team Section */}
-        <div className="mb-20">
+{/*      <div className="mb-20">
           <h2 className="text-4xl font-bold text-center text-blue-800 mb-12">Our Team</h2>
           <div className="flex justify-center">
             <motion.div
@@ -119,9 +119,9 @@ const AboutUs = () => {
                   <FaGithub size={22} />
                 </a>
               </div>
-            </motion.div>
-          </div>
-        </div>
+            </motion.div> 
+          </div> 
+        </div> */}
 
         {/* Contact Info */}
         <motion.div 
@@ -135,12 +135,12 @@ const AboutUs = () => {
             <div className="p-4">
               <FaEnvelope className="text-4xl text-blue-500 mx-auto mb-4" />
               <h3 className="text-xl font-semibold mb-2">Email Us</h3>
-              <p className="text-gray-600">eshaanmanchanda01@gmail.com</p>
+              <p className="text-gray-600">dastejindersingh592@gmail.com</p>
             </div>
             <div className="p-4">
               <FaPhone className="text-4xl text-blue-500 mx-auto mb-4" />
               <h3 className="text-xl font-semibold mb-2">Call Us</h3>
-              <p className="text-gray-600">+91 8377012270</p>
+              <p className="text-gray-600">+91 9582290981</p>
             </div>
             <div className="p-4">
               <FaMapMarkerAlt className="text-4xl text-blue-500 mx-auto mb-4" />
